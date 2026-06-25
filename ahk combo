@@ -1032,11 +1032,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
 
-    -- Détection du Soru pour déclencher le combo
-    if self == commERemote and (string.lower(method) == "fireserver") and args[1] == "Soru" then
-        if GeneratedComboButton and GeneratedComboButton.Parent then task.spawn(TriggerMacroExecution) end
-    end
-
     -- Détection des V-Skills et Z-Skills
     if typeof(args[1]) == "string" then
         local skill = args[1]:upper()

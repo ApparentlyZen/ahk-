@@ -8,300 +8,14 @@ local DIAMOND_ANIMATION_ID = "14414815375"
 local DROP_TO_FPS = 5
 local LAG_DURATION = 0.43
 local FEATURE_ENABLED = true 
+local currentMode = "V2" -- V2 = Automatique, V1 = Manuel
 
 local rs = game:GetService("RunService") 
 local plrs = game:GetService("Players") 
 local lp = plrs.LocalPlayer 
 local uis = game:GetService("UserInputService")
 
--- Structure de l'interface utilisateur (Beau Menu Rouge Sombre)
-local gui = Instance.new("ScreenGui")
-gui.Name = "nameless lagswitch gui"
-gui.ResetOnSpawn = false 
-gui.Parent = (get_hidden_gui and get_hidden_gui()) or game.CoreGui 
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 155) 
-frame.Position = UDim2.new(0.4, 0, 0.3, 0) 
-frame.BackgroundColor3 = Color3.fromRGB(40, 15, 15) -- Thème Rouge Sombre
-frame.Active = true 
-frame.BorderSizePixel = 0 
-frame.ClipsDescendants = true 
-frame.Parent = gui 
-
-local uicorner = Instance.new("UICorner", frame) 
-uicorner.CornerRadius = UDim.new(0, 14) 
-
--- Bordure lumineuse rouge
-local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2
-stroke.Color = Color3.fromRGB(235, 60, 60)
-stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-stroke.Parent = frame
-
--- Titre du Menu
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -60, 0, 30)
-titleLabel.Position = UDim2.new(0, 12, 0, 4)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Nameless LagSwitch"
-titleLabel.TextColor3 = Color3.fromRGB(255, 200, 200)
-titleLabel.TextSize = 14
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = frame
-
--- Bouton Fermer (X)
-local close = Instance.new("TextButton") 
-close.Size = UDim2.new(0, 18, 0, 18) 
-close.Position = UDim2.new(1, -24, 0, 10) 
-close.BackgroundColor3 = Color3.fromRGB(255, 80, 100) 
-close.Text = "×" 
-close.TextSize = 16 
-close.Font = Enum.Font.GothamBold 
-close.TextColor3 = Color3.new(1, 1, 1) 
-close.BorderSizePixel = 0 
-close.ZIndex = 5
-close.Parent = frame 
-
-local closeCorner = Instance.new("UICorner", close) 
-closeCorner.CornerRadius = UDim.new(1, 0) 
-
-close.MouseButton1Click:Connect(function() 
-    gui:Destroy() 
-end)
-
--- Bouton Réduire (-)
-local minimize = Instance.new("TextButton") 
-minimize.Size = UDim2.new(0, 18, 0, 18) 
-minimize.Position = UDim2.new(1, -48, 0, 10) 
-minimize.BackgroundColor3 = Color3.fromRGB(180, 50, 50) 
-minimize.Text = "-" 
-minimize.TextSize = 16 
-minimize.Font = Enum.Font.GothamBold 
-minimize.TextColor3 = Color3.new(1, 1, 1) 
-minimize.BorderSizePixel = 0 
-minimize.ZIndex = 5
-minimize.Parent = frame 
-
-local minCorner = Instance.new("UICorner", minimize) 
-minCorner.CornerRadius = UDim.new(1, 0) 
-
--- Bouton invisible en mode réduit pour afficher le "+" textuel sans bloquer
-local reopenText = Instance.new("TextLabel")
-reopenText.Size = UDim2.new(1, 0, 1, 0)
-reopenText.BackgroundTransparency = 1
-reopenText.Text = "+"
-reopenText.TextColor3 = Color3.new(1, 1, 1)
-reopenText.TextSize = 24
-reopenText.Font = Enum.Font.GothamBold
-reopenText.ZIndex = 4
-reopenText.Visible = false
-reopenText.Parent = frame
-
--- Éléments à masquer pendant la réduction
-local contentElements = {}
-local isMinimized = false
-
--- --- FONCTION DE TRANSFORMATION ---
-local function toggleMinimize()
-    isMinimized = not isMinimized
-    if isMinimized then
-        for _, item in ipairs(contentElements) do
-            item.Visible = false
-        end
-        titleLabel.Visible = false
-        close.Visible = false
-        minimize.Visible = false
-        
-        uicorner.CornerRadius = UDim.new(1, 0) -- Mode Gros Rond 45x45
-        reopenText.Visible = true
-        
-        frame:TweenSize(UDim2.new(0, 45, 0, 45), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.25, true)
-    else
-        uicorner.CornerRadius = UDim.new(0, 14)
-        reopenText.Visible = false
-        
-        frame:TweenSize(UDim2.new(0, 220, 0, 155), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.25, true, function()
-            titleLabel.Visible = true
-            close.Visible = true
-            minimize.Visible = true
-            for _, item in ipairs(contentElements) do
-                item.Visible = true
-            end
-        end)
-    end
-end
-
--- --- LE CERVEAU UNIQUE DU DRAG ET DU TAP ---
-local dragging = false
-local dragInput
-local dragStart = Vector3.new()
-local startPos = UDim2.new()
-
-local startTouchTime = 0
-local hasMovedMuch = false
-
-local function onInputBegan(input)
-    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-        if uis:GetFocusedTextBox() then return end
-        
-        dragging = true
-        hasMovedMuch = false
-        dragStart = input.Position
-        startPos = frame.Position
-        startTouchTime = os.clock()
-        
-        local connection
-        connection = input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-                connection:Disconnect()
-                
-                -- SI ON EST RÉDUIT : On vérifie si c'est un Tap rapide sans grand mouvement
-                if isMinimized and not hasMovedMuch and (os.clock() - startTouchTime) < 0.25 then
-                    toggleMinimize()
-                end
-            end
-        end)
-    end
-end
-
--- Clic classique du bouton "-" quand le menu est OUVERT
-minimize.MouseButton1Click:Connect(function()
-    if not isMinimized then
-        toggleMinimize()
-    end
-end)
-
-frame.InputBegan:Connect(onInputBegan)
-
-frame.InputChanged:Connect(function(input)
-    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        dragInput = input
-    end
-end)
-
-uis.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        -- Si le doigt bouge de plus de 5 pixels, c'est officiellement un DRAG
-        if delta.Magnitude > 5 then
-            hasMovedMuch = true
-        end
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- --- INPUT 1 : Target FPS ---
-local fpsLabel = Instance.new("TextLabel")
-fpsLabel.Size = UDim2.new(0, 110, 0, 25)
-fpsLabel.Position = UDim2.new(0, 12, 0, 45)
-fpsLabel.BackgroundTransparency = 1
-fpsLabel.Text = "Target FPS:"
-fpsLabel.TextColor3 = Color3.fromRGB(230, 180, 180)
-fpsLabel.TextSize = 12
-fpsLabel.Font = Enum.Font.GothamMedium
-fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
-fpsLabel.Parent = frame
-table.insert(contentElements, fpsLabel)
-
-local fpsInput = Instance.new("TextBox")
-fpsInput.Size = UDim2.new(0, 70, 0, 25)
-fpsInput.Position = UDim2.new(1, -82, 0, 45)
-fpsInput.BackgroundColor3 = Color3.fromRGB(90, 30, 30)
-fpsInput.BorderSizePixel = 0
-fpsInput.Text = tostring(DROP_TO_FPS)
-fpsInput.TextColor3 = Color3.new(1, 1, 1)
-fpsInput.TextSize = 12
-fpsInput.Font = Enum.Font.GothamBold
-fpsInput.PlaceholderText = "5"
-fpsInput.Parent = frame
-table.insert(contentElements, fpsInput)
-Instance.new("UICorner", fpsInput).CornerRadius = UDim.new(0, 6)
-
-fpsInput.FocusLost:Connect(function(enterPressed)
-    local val = tonumber(fpsInput.Text)
-    if val and val >= 1 and val <= 60 then
-        DROP_TO_FPS = math.floor(val)
-    else
-        fpsInput.Text = tostring(DROP_TO_FPS)
-    end
-end)
-
--- --- INPUT 2 : Lag Duration ---
-local timeLabel = Instance.new("TextLabel")
-timeLabel.Size = UDim2.new(0, 110, 0, 25)
-timeLabel.Position = UDim2.new(0, 12, 0, 80)
-timeLabel.BackgroundTransparency = 1
-timeLabel.Text = "Lag Duration (s):"
-timeLabel.TextColor3 = Color3.fromRGB(230, 180, 180)
-timeLabel.TextSize = 12
-timeLabel.Font = Enum.Font.GothamMedium
-timeLabel.TextXAlignment = Enum.TextXAlignment.Left
-timeLabel.Parent = frame
-table.insert(contentElements, timeLabel)
-
-local timeInput = Instance.new("TextBox")
-timeInput.Size = UDim2.new(0, 70, 0, 25)
-timeInput.Position = UDim2.new(1, -82, 0, 80)
-timeInput.BackgroundColor3 = Color3.fromRGB(90, 30, 30)
-timeInput.BorderSizePixel = 0
-timeInput.Text = string.format("%.2f", LAG_DURATION)
-timeInput.TextColor3 = Color3.new(1, 1, 1)
-timeInput.TextSize = 12
-timeInput.Font = Enum.Font.GothamBold
-timeInput.PlaceholderText = "0.43"
-timeInput.Parent = frame
-table.insert(contentElements, timeInput)
-Instance.new("UICorner", timeInput).CornerRadius = UDim.new(0, 6)
-
-timeInput.FocusLost:Connect(function(enterPressed)
-    local val = tonumber(timeInput.Text)
-    if val and val >= 0.05 and val <= 5 then
-        LAG_DURATION = math.round(val * 100) / 100
-    else
-        timeInput.Text = string.format("%.2f", LAG_DURATION)
-    end
-end)
-
--- --- TOGGLE BUTTON : Status (ON / OFF) ---
-local toggleLabel = Instance.new("TextLabel")
-toggleLabel.Size = UDim2.new(0, 110, 0, 25)
-toggleLabel.Position = UDim2.new(0, 12, 0, 115)
-toggleLabel.BackgroundTransparency = 1
-toggleLabel.Text = "Lag Feature:"
-toggleLabel.TextColor3 = Color3.fromRGB(230, 180, 180)
-toggleLabel.TextSize = 12
-toggleLabel.Font = Enum.Font.GothamMedium
-toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-toggleLabel.Parent = frame
-table.insert(contentElements, toggleLabel)
-
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 70, 0, 25)
-toggleButton.Position = UDim2.new(1, -82, 0, 115)
-toggleButton.BackgroundColor3 = Color3.fromRGB(46, 139, 87) 
-toggleButton.Text = "ON"
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.TextSize = 12
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.Parent = frame
-table.insert(contentElements, toggleButton)
-Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
-
-toggleButton.MouseButton1Click:Connect(function()
-    FEATURE_ENABLED = not FEATURE_ENABLED
-    if FEATURE_ENABLED then
-        toggleButton.Text = "ON"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(46, 139, 87)
-    else
-        toggleButton.Text = "OFF"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(178, 34, 34) 
-    end
-end)
-
--- --- Logique Infaillible et Invisible ---
+-- --- LOGIQUE DU LAG SWITCH (Mise en haut pour être accessible partout) ---
 local lagBusy = false 
 local function dropFPS() 
     if not FEATURE_ENABLED or lagBusy then return end 
@@ -327,7 +41,338 @@ local function dropFPS()
     lagBusy = false 
 end 
 
--- Détecteur automatique en arrière-plan (Silencieux)
+-- Structure de l'interface utilisateur (Beau Menu Rouge Sombre)
+local gui = Instance.new("ScreenGui")
+gui.Name = "nameless lagswitch gui"
+gui.ResetOnSpawn = false 
+gui.Parent = (get_hidden_gui and get_hidden_gui()) or game.CoreGui 
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 230) 
+frame.Position = UDim2.new(0.4, 0, 0.3, 0) 
+frame.BackgroundColor3 = Color3.fromRGB(40, 15, 15) 
+frame.Active = true 
+frame.BorderSizePixel = 0 
+frame.ClipsDescendants = true 
+frame.Parent = gui 
+
+local uicorner = Instance.new("UICorner", frame) 
+uicorner.CornerRadius = UDim.new(0, 14) 
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(235, 60, 60)
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Parent = frame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -60, 0, 30)
+titleLabel.Position = UDim2.new(0, 12, 0, 4)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Nameless LagSwitch"
+titleLabel.TextColor3 = Color3.fromRGB(255, 200, 200)
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = frame
+
+local close = Instance.new("TextButton") 
+close.Size = UDim2.new(0, 18, 0, 18) 
+close.Position = UDim2.new(1, -24, 0, 10) 
+close.BackgroundColor3 = Color3.fromRGB(255, 80, 100) 
+close.Text = "×" 
+close.TextSize = 16 
+close.Font = Enum.Font.GothamBold 
+close.TextColor3 = Color3.new(1, 1, 1) 
+close.BorderSizePixel = 0 
+close.ZIndex = 5
+close.Parent = frame 
+
+local closeCorner = Instance.new("UICorner", close) 
+closeCorner.CornerRadius = UDim.new(1, 0) 
+
+close.MouseButton1Click:Connect(function() 
+    gui:Destroy() 
+end)
+
+local minimize = Instance.new("TextButton") 
+minimize.Size = UDim2.new(0, 18, 0, 18) 
+minimize.Position = UDim2.new(1, -48, 0, 10) 
+minimize.BackgroundColor3 = Color3.fromRGB(180, 50, 50) 
+minimize.Text = "-" 
+minimize.TextSize = 16 
+minimize.Font = Enum.Font.GothamBold 
+minimize.TextColor3 = Color3.new(1, 1, 1) 
+minimize.BorderSizePixel = 0 
+minimize.ZIndex = 5
+minimize.Parent = frame 
+
+local minCorner = Instance.new("UICorner", minimize) 
+minCorner.CornerRadius = UDim.new(1, 0) 
+
+local reopenText = Instance.new("TextLabel")
+reopenText.Size = UDim2.new(1, 0, 1, 0)
+reopenText.BackgroundTransparency = 1
+reopenText.Text = "+"
+reopenText.TextColor3 = Color3.new(1, 1, 1)
+reopenText.TextSize = 24
+reopenText.Font = Enum.Font.GothamBold
+reopenText.ZIndex = 4
+reopenText.Visible = false
+reopenText.Parent = frame
+
+local contentElements = {}
+local isMinimized = false
+
+local function toggleMinimize()
+    isMinimized = not isMinimized
+    if isMinimized then
+        for _, item in ipairs(contentElements) do
+            item.Visible = false
+        end
+        titleLabel.Visible = false
+        close.Visible = false
+        minimize.Visible = false
+        
+        uicorner.CornerRadius = UDim.new(1, 0) 
+        reopenText.Visible = true
+        
+        frame:TweenSize(UDim2.new(0, 45, 0, 45), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
+    else
+        uicorner.CornerRadius = UDim.new(0, 14)
+        reopenText.Visible = false
+        
+        frame:TweenSize(UDim2.new(0, 220, 0, 230), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.25, true, function()
+            titleLabel.Visible = true
+            close.Visible = true
+            minimize.Visible = true
+            for _, item in ipairs(contentElements) do
+                if item == manualLagButton and currentMode == "V2" then
+                    item.Visible = false
+                else
+                    item.Visible = true
+                end
+            end
+        end)
+    end
+end
+
+local dragging = false
+local dragInput
+local dragStart = Vector3.new()
+local startPos = UDim2.new()
+
+local startTouchTime = 0
+local hasMovedMuch = false
+
+local function onInputBegan(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        if uis:GetFocusedTextBox() then return end
+        
+        dragging = true
+        hasMovedMuch = false
+        dragStart = input.Position
+        startPos = frame.Position
+        startTouchTime = os.clock()
+        
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                connection:Disconnect()
+                
+                if isMinimized and not hasMovedMuch and (os.clock() - startTouchTime) < 0.25 then
+                    toggleMinimize()
+                end
+            end
+        end)
+    end
+end
+
+minimize.MouseButton1Click:Connect(function()
+    if not isMinimized then
+        toggleMinimize()
+    end
+end)
+
+frame.InputBegan:Connect(onInputBegan)
+
+frame.InputChanged:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        dragInput = input
+    end
+end)
+
+uis.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        if delta.Magnitude > 5 then
+            hasMovedMuch = true
+        end
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.LayoutOrder = 1
+fpsLabel.Size = UDim2.new(0, 110, 0, 25)
+fpsLabel.Position = UDim2.new(0, 12, 0, 45)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "Target FPS:"
+fpsLabel.TextColor3 = Color3.fromRGB(230, 180, 180)
+fpsLabel.TextSize = 12
+fpsLabel.Font = Enum.Font.GothamMedium
+fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+fpsLabel.Parent = frame
+table.insert(contentElements, fpsLabel)
+
+local fpsInput = Instance.new("TextBox")
+fpsInput.LayoutOrder = 1
+fpsInput.Size = UDim2.new(0, 70, 0, 25)
+fpsInput.Position = UDim2.new(1, -82, 0, 45)
+fpsInput.BackgroundColor3 = Color3.fromRGB(90, 30, 30)
+fpsInput.BorderSizePixel = 0
+fpsInput.Text = tostring(DROP_TO_FPS)
+fpsInput.TextColor3 = Color3.new(1, 1, 1)
+fpsInput.TextSize = 12
+fpsInput.Font = Enum.Font.GothamBold
+fpsInput.PlaceholderText = "5"
+fpsInput.Parent = frame
+table.insert(contentElements, fpsInput)
+Instance.new("UICorner", fpsInput).CornerRadius = UDim.new(0, 6)
+
+fpsInput.FocusLost:Connect(function(enterPressed)
+    local val = tonumber(fpsInput.Text)
+    if val and val >= 1 and val <= 60 then
+        DROP_TO_FPS = math.floor(val)
+    else
+        fpsInput.Text = tostring(DROP_TO_FPS)
+    end
+end)
+
+local timeLabel = Instance.new("TextLabel")
+timeLabel.LayoutOrder = 2
+timeLabel.Size = UDim2.new(0, 110, 0, 25)
+timeLabel.Position = UDim2.new(0, 12, 0, 80)
+timeLabel.BackgroundTransparency = 1
+timeLabel.Text = "Lag Duration (s):"
+timeLabel.TextColor3 = Color3.fromRGB(230, 180, 180)
+timeLabel.TextSize = 12
+timeLabel.Font = Enum.Font.GothamMedium
+timeLabel.TextXAlignment = Enum.TextXAlignment.Left
+timeLabel.Parent = frame
+table.insert(contentElements, timeLabel)
+
+local timeInput = Instance.new("TextBox")
+timeInput.LayoutOrder = 2
+timeInput.Size = UDim2.new(0, 70, 0, 25)
+timeInput.Position = UDim2.new(1, -82, 0, 80)
+timeInput.BackgroundColor3 = Color3.fromRGB(90, 30, 30)
+timeInput.BorderSizePixel = 0
+timeInput.Text = string.format("%.2f", LAG_DURATION)
+timeInput.TextColor3 = Color3.new(1, 1, 1)
+timeInput.TextSize = 12
+timeInput.Font = Enum.Font.GothamBold
+timeInput.PlaceholderText = "0.43"
+timeInput.Parent = frame
+table.insert(contentElements, timeInput)
+Instance.new("UICorner", timeInput).CornerRadius = UDim.new(0, 6)
+
+timeInput.FocusLost:Connect(function(enterPressed)
+    local val = tonumber(timeInput.Text)
+    if val and val >= 0.05 and val <= 5 then
+        LAG_DURATION = math.round(val * 100) / 100
+    else
+        timeInput.Text = string.format("%.2f", LAG_DURATION)
+    end
+end)
+
+local toggleLabel = Instance.new("TextLabel")
+toggleLabel.LayoutOrder = 3
+toggleLabel.Size = UDim2.new(0, 110, 0, 25)
+toggleLabel.Position = UDim2.new(0, 12, 0, 115)
+toggleLabel.BackgroundTransparency = 1
+toggleLabel.Text = "Lag Feature:"
+toggleLabel.TextColor3 = Color3.fromRGB(230, 180, 180)
+toggleLabel.TextSize = 12
+toggleLabel.Font = Enum.Font.GothamMedium
+toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+toggleLabel.Parent = frame
+table.insert(contentElements, toggleLabel)
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.LayoutOrder = 3
+toggleButton.Size = UDim2.new(0, 70, 0, 25)
+toggleButton.Position = UDim2.new(1, -82, 0, 115)
+toggleButton.BackgroundColor3 = Color3.fromRGB(46, 139, 87) 
+toggleButton.Text = "ON"
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.TextSize = 12
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.Parent = frame
+table.insert(contentElements, toggleButton)
+Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
+
+toggleButton.MouseButton1Click:Connect(function()
+    FEATURE_ENABLED = not FEATURE_ENABLED
+    if FEATURE_ENABLED then
+        toggleButton.Text = "ON"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(46, 139, 87)
+    else
+        toggleButton.Text = "OFF"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(178, 34, 34) 
+    end
+end)
+
+local modeButton = Instance.new("TextButton")
+modeButton.LayoutOrder = 4
+modeButton.Size = UDim2.new(1, -24, 0, 28)
+modeButton.Position = UDim2.new(0, 12, 0, 150)
+modeButton.BackgroundColor3 = Color3.fromRGB(100, 40, 160) 
+modeButton.Text = "Mode: V2 (Auto)"
+modeButton.TextColor3 = Color3.new(1, 1, 1)
+modeButton.TextSize = 12
+modeButton.Font = Enum.Font.GothamBold
+modeButton.Parent = frame
+table.insert(contentElements, modeButton)
+Instance.new("UICorner", modeButton).CornerRadius = UDim.new(0, 6)
+
+local manualLagButton = Instance.new("TextButton")
+manualLagButton.LayoutOrder = 5
+manualLagButton.Size = UDim2.new(1, -24, 0, 32)
+manualLagButton.Position = UDim2.new(0, 12, 0, 185)
+manualLagButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+manualLagButton.Text = "⚡ MANUAL LAG ⚡"
+manualLagButton.TextColor3 = Color3.new(1, 1, 1)
+manualLagButton.TextSize = 13
+manualLagButton.Font = Enum.Font.GothamBlack
+manualLagButton.Visible = false 
+manualLagButton.Parent = frame
+table.insert(contentElements, manualLagButton)
+Instance.new("UICorner", manualLagButton).CornerRadius = UDim.new(0, 6)
+
+modeButton.MouseButton1Click:Connect(function()
+    if currentMode == "V2" then
+        currentMode = "V1"
+        modeButton.Text = "Mode: V1 (Manuel)"
+        modeButton.BackgroundColor3 = Color3.fromRGB(40, 100, 160) 
+        manualLagButton.Visible = true
+    else
+        currentMode = "V2"
+        modeButton.Text = "Mode: V2 (Auto)"
+        modeButton.BackgroundColor3 = Color3.fromRGB(100, 40, 160) 
+        manualLagButton.Visible = false
+    end
+end)
+
+-- Logique du bouton corrigée ( dropFPS est maintenant détecté à 100% )
+manualLagButton.MouseButton1Click:Connect(function()
+    if FEATURE_ENABLED then
+        task.spawn(dropFPS)
+    end
+end)
+
+-- Détecteur automatique en arrière-plan
 local function connectAnimationWatcher() 
     local char = lp.Character or lp.CharacterAdded:Wait() 
     local hum = char:WaitForChild("Humanoid") 
@@ -344,20 +389,18 @@ local function connectAnimationWatcher()
         local animId = tostring(anim.Animation.AnimationId) 
         local animName = anim.Name or ""
         
-        if animId:find(SANGUINE_ANIMATION_ID) or animId:find(GHOUL_ANIMATION_ID) or animName == GHOUL_ANIMATION_NAME or animId:find(DIAMOND_ANIMATION_ID) then 
-            dropFPS() 
+        if currentMode == "V2" and (animId:find(SANGUINE_ANIMATION_ID) or animId:find(GHOUL_ANIMATION_ID) or animName == GHOUL_ANIMATION_NAME or animId:find(DIAMOND_ANIMATION_ID)) then 
+            task.spawn(dropFPS) 
         end
     end) 
 end 
 
--- Initialisation
 lp.CharacterAdded:Connect(function() 
     task.wait(1) 
     connectAnimationWatcher() 
 end) 
 if lp.Character then connectAnimationWatcher() end 
 
--- Anti-duplicate global
 for _,v in pairs(game.CoreGui:GetChildren()) do 
     if v:IsA("ScreenGui") and v ~= gui and v.Name == gui.Name then 
         pcall(function() v:Destroy() end) 

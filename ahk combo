@@ -9,8 +9,8 @@ local TweenService = game:GetService("TweenService")
 
 local PlayerGui = lp:WaitForChild("PlayerGui")
 
-if PlayerGui:FindFirstChild("namelessWare_MobileAHK") then
-    PlayerGui.namelessWare_MobileAHK:Destroy()
+if PlayerGui:FindFirstChild("namelessWare_AHK_Combo") then
+    PlayerGui.namelessWare_AHK_Combo:Destroy()
 end
 
 -- Couleurs de l'interface
@@ -321,7 +321,7 @@ end)
 -- INTERFACE GRAPHIQUE PRINCIPALE
 -- ====================================================================
 local ScreenGui = Instance.new("ScreenGui", PlayerGui)
-ScreenGui.Name = "namelessWare_MobileAHK"
+ScreenGui.Name = "namelessWare_AHK_Combo"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = mkFrame(ScreenGui, UDim2.new(0, 560, 0, 320), UDim2.new(0.5, -280, 0.5, -160), T_BG, 8)
@@ -794,7 +794,7 @@ end)
 -- DRAG / MINIMIZE INTERFACE
 ----------------------------------------------------
 local miniBar = Instance.new("Frame", ScreenGui)
-miniBar.Size = UDim2.new(0, 50, 0, 50)
+miniBar.Size = UDim2.new(0, 40, 0, 40)
 miniBar.Position = UDim2.new(0.02, 0, 0.05, 0)
 miniBar.BackgroundColor3 = T_BG
 miniBar.BackgroundTransparency = 1 
@@ -944,8 +944,8 @@ local function TriggerMacroExecution()
                     task.wait(data.hold)
                     VirtualInputManager:SendKeyEvent(false, skillKey, false, game)
                 else
+                    -- ⚡ Ghost Click Overdrive (V2)
                     VirtualInputManager:SendKeyEvent(true, skillKey, false, game)
-                    RunService.Heartbeat:Wait()
                     VirtualInputManager:SendKeyEvent(false, skillKey, false, game)
                     VirtualInputManager:SendKeyEvent(true, skillKey, false, game)
                     RunService.RenderStepped:Wait()

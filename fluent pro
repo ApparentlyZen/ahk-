@@ -2468,7 +2468,6 @@ end
             end
 
             TableInsert(Page.Window.Pages, Page)
-            if Page.Window.Categories[Page] then Page.Window.Categories[Page]:AddPage(Page) end
             return setmetatable(Page, Library.Pages)
         end
 
@@ -2491,13 +2490,7 @@ end
                 })                
             end
 
-            local CategoryObject = {
-                AddPage = function(self, page)
-                    page.Items["Inactive"].Instance.Parent = Items["Category"].Instance.Parent
-                end
-            }
-            self.Categories[Name] = CategoryObject
-            return CategoryObject
+            return Items
         end
 
 Library.Pages.SubPage = function(self, Data)

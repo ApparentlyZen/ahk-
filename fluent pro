@@ -187,7 +187,6 @@ local Library do
     Library.Sections.__index = Library.Sections
     Library.Pages.__index = Library.Pages
 
-    Library.Categories = {}
     Library.Theme = TableClone(Themes["Preset"])
 
     -- Folders
@@ -2555,7 +2554,6 @@ end
     end
 
     table.insert(Page.Page.SubPages, Page)
-            if Page.Window.Categories[Page] then Page.Window.Categories[Page]:AddPage(Page) end
     return setmetatable(Page, Library.Pages)
 end
 

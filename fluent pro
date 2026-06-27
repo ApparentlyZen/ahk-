@@ -283,7 +283,6 @@ local aa = {
         local IconURLs = {
             lucide    = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/lucide/dist/Icons.lua",
             gravity   = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/gravity/dist/Icons.lua",
-            solar     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/solar/dist/Icons.lua",
             sfsymbols = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/sfsymbols/dist/Icons.lua",
             craft     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/craft/dist/Icons.lua",
             geist     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/geist/dist/Icons.lua",
@@ -950,8 +949,8 @@ local aa = {
                     UserInfoTitle = D.UserInfoTitle, UserInfoSubtitle = D.UserInfoSubtitle,
                     UserInfoColor = D.UserInfoColor,
                     Search = D.Search,
-                    TabLogo = D.Icons or D.TabLogo or "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true",
-                    TitleIcon = D.TitleIcon or "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true",
+                    TabLogo = D.Icons or D.TabLogo,
+                    TitleIcon = D.TitleIcon,
                 }
             x.Window = E
             x:SetTheme(D.Theme)
@@ -3843,7 +3842,7 @@ local aa = {
         local h, i, j, k =
             game:GetService "UserInputService",
             game:GetService "Players".LocalPlayer:GetMouse(),
-            workspace.CurrentCamera,
+            game:GetService "Workspace".CurrentCamera,
             d.Parent.Parent
         local l, m, n, o, p = e(k.Packages.Flipper), e(k.Creator), e(k.Acrylic), e(d.Parent.Assets), d.Parent
         local q, r, s = l.Spring.new, l.Instant.new, m.New
@@ -9615,11 +9614,6 @@ local aa = {
     [52] = function() --[[ BloodRed ]]
         local aa, ab, ac, ad, ae = b(52)
         return {
-            -- MODIFICATION: Ajout de votre image en fond par défaut pour ce thème
-            Background = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true",
-            BackgroundTransparency = 0.85, -- Vous pouvez ajuster la transparence (0 = opaque, 1 = invisible)
-            -- FIN MODIFICATION
-
             Name = "Blood Red",
             Accent = Color3.fromRGB(180, 10, 20),
             AcrylicMain = Color3.fromRGB(35, 8, 10),

@@ -585,13 +585,18 @@ local Library do
         getgenv().Library = nil
     end
 
+    -- ============================================================
+    --  Fonction pour télécharger une image depuis une URL HTTP
+    -- ============================================================
     Library.GetImageFromURL = function(self, url)
         if not url or url == "" then return nil end
 
+        -- Si c'est déjà un rbxassetid, on le renvoie directement
         if StringFind(url, "^rbxassetid://") then
             return url
         end
 
+        -- Générer un nom de fichier unique à partir de l'URL
         local fileName = StringGSub(url, "https?://", "")
         fileName = StringGSub(fileName, "[^%w%-%.]", "_")
         local path = Library.Folders.Assets .. "/" .. fileName
@@ -1902,6 +1907,25 @@ Library.Window = function(self, Data)
 
     local Items = { } do
         local FirstLetterOfName = StringSub(Window.Name, 1, 1)
+
+        -- =====================================================================
+        --  TRAITEMENT DU LOGO (affiché dans l'icône du menu)
+        --  Maintenant il accepte aussi les URLs HTTP (GitHub, etc.)
+        -- =====================================================================
+        local logoPath = nil
+        if Window.Logo and Window.Logo ~= "" then
+            if StringFind(Window.Logo, "^https?://") then
+                logoPath = Library:GetImageFromURL(Window.Logo)
+                if not logoPath then
+                    warn("Impossible de charger le logo distant. Utilisation du fallback.")
+                end
+            elseif StringFind(Window.Logo, "^rbxassetid://") then
+                logoPath = Window.Logo
+            else
+                logoPath = Window.Logo
+            end
+        end
+
         Items["MainFrame"] = Instances:Create("Frame", {
             Parent = Library.Holder.Instance,
             Name = "\0",
@@ -1979,6 +2003,7 @@ Library.Window = function(self, Data)
             ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         }):AddToTheme({Color = "Border"})
 
+        -- Texte de fallback (première lettre) pour l'icône
         Items["Text"] = Instances:Create("TextLabel", {
             Parent = Items["Background"].Instance,
             Name = "\0",
@@ -1995,29 +2020,24 @@ Library.Window = function(self, Data)
             BackgroundColor3 = FromRGB(255, 255, 255)
         })
 
-if Window.Logo and Window.Logo ~= "" then
-    Items["LogoImage"] = Instances:Create("ImageLabel", {
-        Parent = Items["Background"].Instance,
-        Name = "\0",
-        AnchorPoint = Vector2New(0.5, 0.5),
-        Position = UDim2New(0.5, 0, 0.5, 0),
-        BorderColor3 = FromRGB(0, 0, 0),
-        Size = UDim2New(1, 0, 1, 0),
-        BorderSizePixel = 0,
-        Image = Window.Logo,
-        BackgroundTransparency = 1,
-        ScaleType = Enum.ScaleType.Fit,
-        ZIndex = 2
-    })
-
-    local LogoCorner = Instances:Create("UICorner", {
-        Parent = Items["LogoImage"].Instance,
-        Name = "\0",
-        CornerRadius = UDimNew(0, 7)
-    })
-
-    Items["Text"].Instance.Visible = false
-end
+        -- Si un logo (local ou distant) a été chargé, on l'utilise à la place du texte
+        if logoPath then
+            Items["LogoImage"] = Instances:Create("ImageLabel", {
+                Parent = Items["Background"].Instance,
+                Name = "\0",
+                AnchorPoint = Vector2New(0.5, 0.5),
+                Position = UDim2New(0.5, 0, 0.5, 0),
+                BorderColor3 = FromRGB(0, 0, 0),
+                Size = UDim2New(1, 0, 1, 0),
+                BorderSizePixel = 0,
+                Image = logoPath,
+                BackgroundTransparency = 1,
+                ScaleType = Enum.ScaleType.Fit,
+                ZIndex = 2
+            })
+            -- On cache le texte fallback
+            Items["Text"].Instance.Visible = false
+        end
         
         Items["RealTitle"] = Instances:Create("TextLabel", {
             Parent = Items["Title"].Instance,
@@ -2170,7 +2190,7 @@ end
         end)
 
         -- =============================
-        -- BOUTON DE BASCULE (TOGGLE) avec image remplissant tout le bouton
+        -- BOUTON DE BASCULE (TOGGLE)
         -- =============================
         Items["ToggleButton"] = Instances:Create("TextButton", {
             Parent = Library.Holder.Instance,
@@ -2183,7 +2203,7 @@ end
             Text = "",
             AutoButtonColor = false,
             FontFace = Library.Font,
-            ClipsDescendants = true,   -- pour rogner l'image selon le coin arrondi
+            ClipsDescendants = true,
         })
         Items["ToggleButton"]:AddToTheme({BackgroundColor3 = "Element"})
         Instances:Create("UICorner", {
@@ -2199,37 +2219,36 @@ end
             Thickness = 1.5
         }):AddToTheme({Color = "Border 2"})
 
-        -- Déterminer l'image du bouton
+        -- Image du bouton toggle
         local toggleImage = Window.ToggleLogo or Window.Logo
-        local imagePath = nil
+        local togglePath = nil
 
         if toggleImage and toggleImage ~= "" then
             if StringFind(toggleImage, "^https?://") then
-                imagePath = Library:GetImageFromURL(toggleImage)
-                if not imagePath then
-                    warn("Impossible de charger l'image distante. Utilisation du fallback.")
+                togglePath = Library:GetImageFromURL(toggleImage)
+                if not togglePath then
+                    warn("Impossible de charger l'image du toggle. Utilisation du fallback.")
                 end
             elseif StringFind(toggleImage, "^rbxassetid://") then
-                imagePath = toggleImage
+                togglePath = toggleImage
             else
-                imagePath = toggleImage
+                togglePath = toggleImage
             end
         end
 
-        if imagePath then
+        if togglePath then
             local img = Instances:Create("ImageLabel", {
                 Parent = Items["ToggleButton"].Instance,
                 Name = "ToggleIcon",
                 AnchorPoint = Vector2New(0.5, 0.5),
                 Position = UDim2New(0.5, 0, 0.5, 0),
-                Size = UDim2New(1, 0, 1, 0),      -- remplit tout le bouton
+                Size = UDim2New(1, 0, 1, 0),
                 BackgroundTransparency = 1,
-                Image = imagePath,
-                ScaleType = Enum.ScaleType.Stretch, -- étire pour remplir entièrement
+                Image = togglePath,
+                ScaleType = Enum.ScaleType.Stretch,
                 BorderSizePixel = 0,
             })
         else
-            -- Fallback : texte qui remplit aussi tout le bouton
             local toggleText = Instances:Create("TextLabel", {
                 Parent = Items["ToggleButton"].Instance,
                 Name = "ToggleText",
@@ -2240,7 +2259,7 @@ end
                 AnchorPoint = Vector2New(0.5, 0.5),
                 BackgroundTransparency = 1,
                 Position = UDim2New(0.5, 0, 0.5, 0),
-                Size = UDim2New(1, 0, 1, 0),       -- remplit tout le bouton
+                Size = UDim2New(1, 0, 1, 0),
                 BorderSizePixel = 0,
                 TextSize = 24,
                 BackgroundColor3 = FromRGB(255, 255, 255)

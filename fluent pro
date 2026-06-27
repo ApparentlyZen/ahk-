@@ -2214,61 +2214,6 @@ Library.Window = function(self, Data)
     end)
 
     Window:SetCenter()
-
-        -- Ajout du bouton pour afficher/cacher le menu
-        local ToggleButton = Instances:Create("ImageButton", {
-            Parent = Library.Holder.Instance,
-            Name = "NamelessToggle",
-            Size = UDim2.fromOffset(45, 45),
-            Position = UDim2.new(0.02, 0, 0.05, 0),
-            BackgroundColor3 = FromRGB(18, 14, 26),
-            BackgroundTransparency = 0.2,
-            ZIndex = 999,
-            Visible = false -- Initialement caché
-        })
-        ToggleButton:MakeDraggable()
-
-        Instances:Create("UICorner", {
-            Parent = ToggleButton.Instance,
-            CornerRadius = UDim.new(0, 8)
-        })
-
-        Instances:Create("UIStroke", {
-            Parent = ToggleButton.Instance,
-            Color = FromRGB(140, 70, 255),
-            Thickness = 1.5,
-            Transparency = 0.3
-        })
-
-        -- Gestion du logo pour le bouton toggle
-        local toggleLogoUrl = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
-        if getcustomasset then
-            local logoPath = Library.Folders.Assets .. "/toggle_logo.webp"
-            if not isfile(logoPath) then
-                local success, content = pcall(game.HttpGet, game, toggleLogoUrl)
-                if success and content then
-                    writefile(logoPath, content)
-                end
-            end
-            if isfile(logoPath) then
-                ToggleButton.Instance.Image = getcustomasset(logoPath)
-            end
-        else
-            ToggleButton.Instance.Image = toggleLogoUrl
-        end
-
-        -- Logique de visibilité
-        Window.Signal:Connect(function(isOpen)
-            ToggleButton.Instance.Visible = not isOpen
-        end)
-
-        ToggleButton:Connect("MouseButton1Click", function()
-            Window:ToggleInterface()
-        end)
-
-        -- S'assurer que le bouton est bien caché au début
-        ToggleButton.Instance.Visible = not Window.IsOpen
-
     task.wait()
     Window:SetOpen(true)
     return setmetatable(Window, Library)

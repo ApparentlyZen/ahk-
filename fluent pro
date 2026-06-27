@@ -585,22 +585,15 @@ local Library do
         getgenv().Library = nil
     end
 
-    -- ============================================================
-    --  NOUVELLE FONCTION : Téléchargement d'image depuis URL
-    -- ============================================================
     Library.GetImageFromURL = function(self, url)
         if not url or url == "" then return nil end
 
-        -- Si c'est déjà un rbxassetid, on le renvoie directement
         if StringFind(url, "^rbxassetid://") then
             return url
         end
 
-        -- Générer un nom de fichier unique à partir de l'URL
         local fileName = StringGSub(url, "https?://", "")
-        fileName = StringGSub(fileName, "[^%w%-%.]", "_")  -- remplacer les caractères spéciaux
-        -- Si l'URL se termine par .webp, on garde .webp (mais Roblox ne le supportera pas)
-        -- On pourrait forcer .png, mais cela ne convertit pas le fichier.
+        fileName = StringGSub(fileName, "[^%w%-%.]", "_")
         local path = Library.Folders.Assets .. "/" .. fileName
 
         if not isfile(path) then
@@ -2177,7 +2170,7 @@ end
         end)
 
         -- =============================
-        -- BOUTON DE BASCULE (TOGGLE) avec image distante
+        -- BOUTON DE BASCULE (TOGGLE) avec image remplissant tout le bouton
         -- =============================
         Items["ToggleButton"] = Instances:Create("TextButton", {
             Parent = Library.Holder.Instance,
@@ -2190,6 +2183,7 @@ end
             Text = "",
             AutoButtonColor = false,
             FontFace = Library.Font,
+            ClipsDescendants = true,   -- pour rogner l'image selon le coin arrondi
         })
         Items["ToggleButton"]:AddToTheme({BackgroundColor3 = "Element"})
         Instances:Create("UICorner", {
@@ -2210,7 +2204,6 @@ end
         local imagePath = nil
 
         if toggleImage and toggleImage ~= "" then
-            -- Si c'est une URL HTTP, on télécharge via la nouvelle fonction
             if StringFind(toggleImage, "^https?://") then
                 imagePath = Library:GetImageFromURL(toggleImage)
                 if not imagePath then
@@ -2219,7 +2212,6 @@ end
             elseif StringFind(toggleImage, "^rbxassetid://") then
                 imagePath = toggleImage
             else
-                -- On suppose que c'est un chemin local (getcustomasset)
                 imagePath = toggleImage
             end
         end
@@ -2230,14 +2222,14 @@ end
                 Name = "ToggleIcon",
                 AnchorPoint = Vector2New(0.5, 0.5),
                 Position = UDim2New(0.5, 0, 0.5, 0),
-                Size = UDim2New(1, -8, 1, -8),
+                Size = UDim2New(1, 0, 1, 0),      -- remplit tout le bouton
                 BackgroundTransparency = 1,
                 Image = imagePath,
-                ScaleType = Enum.ScaleType.Fit,
+                ScaleType = Enum.ScaleType.Stretch, -- étire pour remplir entièrement
                 BorderSizePixel = 0,
             })
         else
-            -- Fallback : afficher la première lettre
+            -- Fallback : texte qui remplit aussi tout le bouton
             local toggleText = Instances:Create("TextLabel", {
                 Parent = Items["ToggleButton"].Instance,
                 Name = "ToggleText",
@@ -2248,7 +2240,7 @@ end
                 AnchorPoint = Vector2New(0.5, 0.5),
                 BackgroundTransparency = 1,
                 Position = UDim2New(0.5, 0, 0.5, 0),
-                Size = UDim2New(1, -10, 1, -10),
+                Size = UDim2New(1, 0, 1, 0),       -- remplit tout le bouton
                 BorderSizePixel = 0,
                 TextSize = 24,
                 BackgroundColor3 = FromRGB(255, 255, 255)

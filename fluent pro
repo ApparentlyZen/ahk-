@@ -1996,7 +1996,7 @@ local Library do
                 end)
 
                 -- =============================
-                -- BOUTON DE BASCULE (TOGGLE) avec fusion
+                -- BOUTON DE BASCULE (TOGGLE) avec fusion et remplissage total
                 -- =============================
                 Items["ToggleButton"] = Instances:Create("TextButton", {
                     Parent = Library.Holder.Instance,
@@ -2056,10 +2056,10 @@ local Library do
                         Name = "ToggleIcon",
                         AnchorPoint = Vector2New(0.5, 0.5),
                         Position = UDim2New(0.5, 0, 0.5, 0),
-                        Size = UDim2New(0.3.3, 0, 1, 0),
+                        Size = UDim2New(1, 0, 1, 0),          -- 100% du bouton
                         BackgroundTransparency = 1,
                         Image = togglePath,
-                        ScaleType = Enum.ScaleType.Fit,
+                        ScaleType = Enum.ScaleType.Crop,     -- <--- MODIFICATION ICI : remplit tout sans déformer
                         BorderSizePixel = 0,
                     })
                 else

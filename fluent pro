@@ -2210,9 +2210,9 @@ function Library:Window(title, iconId, footerText, useTooltips)
         local hasText = (name and name ~= "")
         
         local TabIcon = RegisterTheme(Instance.new("ImageLabel"), "ImageColor3", "TextDim") TabIcon.Size=UDim2.new(0,18,0,18) TabIcon.BackgroundTransparency=1 TabIcon.Parent=TabBtn
-        local RealIconId = Library.Icons[icon] or icon
-        local CleanId = tostring(RealIconId):gsub("rbxassetid://", "") TabIcon.Image = "rbxassetid://" .. CleanId
         local TabLabel = RegisterTheme(Instance.new("TextLabel"), "TextColor3", "TextDim") TabLabel.Text = name or "" TabLabel.Size = UDim2.new(1, -35, 1, 0) TabLabel.Position = UDim2.new(0, 32, 0, 0) TabLabel.BackgroundTransparency = 1 TabLabel.FontFace = FontMain TabLabel.TextSize = 13 TabLabel.TextXAlignment = Enum.TextXAlignment.Left TabLabel.Parent = TabBtn
+
+        TabIcon.Image = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
 
         if hasText then TabIcon.Position = UDim2.new(0, 8, 0.5, -9) TabLabel.Visible = true else TabIcon.Position = UDim2.new(0.5, -9, 0.5, -9) TabLabel.Visible = false end
 

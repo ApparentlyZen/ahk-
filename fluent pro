@@ -585,6 +585,28 @@ local Library do
         getgenv().Library = nil
     end
 
+    -- Fonction pour obtenir une image depuis une URL (téléchargement automatique)
+    function Library:GetImageFromURL(url)
+        local fileName = StringGSub(url, "https?://", "")
+        fileName = StringGSub(fileName, "/", "_")
+        fileName = StringGSub(fileName, "\\?", "_")
+        local path = self.Folders.Assets .. "/" .. fileName
+        if not isfile(path) then
+            local success, data = pcall(function()
+                return game:HttpGet(url)
+            end)
+            if success and data then
+                writefile(path, data)
+                return getcustomasset(path)
+            else
+                warn("Failed to download image from " .. url)
+                return nil
+            end
+        else
+            return getcustomasset(path)
+        end
+    end
+
     Library.GetImage = function(self, Image)
         local ImageData = self.Images[Image]
 
@@ -1865,6 +1887,7 @@ Library.Window = function(self, Data)
         SubTitle = Data.SubTitle or Data.subtitle or "for PUBG",
         ExpiresIn = Data.ExpiresIn or Data.expiresin or "23d",
         Logo = Data.Logo or Data.logo or nil,
+        ToggleLogo = Data.ToggleLogo or Data.togglelogo or nil,  -- spécifique pour le bouton
         Size = Data.Size or Data.size or UDim2.fromOffset(568, 350),
         
         Pages = { },
@@ -2142,14 +2165,14 @@ end
         end)
 
         -- =============================
-        -- BOUTON DE BASCULE (TOGGLE)
+        -- BOUTON DE BASCULE (TOGGLE) avec image
         -- =============================
         Items["ToggleButton"] = Instances:Create("TextButton", {
             Parent = Library.Holder.Instance,
             Name = "\0",
             AnchorPoint = Vector2New(0, 1),
             Position = UDim2New(0, 20, 1, -20),
-            Size = UDim2New(0, 50, 0, 50),
+            Size = UDim2New(0, 55, 0, 55),
             BackgroundColor3 = FromRGB(30, 34, 34),
             BorderSizePixel = 0,
             Text = "",
@@ -2170,21 +2193,70 @@ end
             Thickness = 1.5
         }):AddToTheme({Color = "Border 2"})
 
-        local toggleText = Instances:Create("TextLabel", {
-            Parent = Items["ToggleButton"].Instance,
-            Name = "\0",
-            FontFace = Library.Font,
-            TextColor3 = FromRGB(255, 255, 255),
-            BorderColor3 = FromRGB(0, 0, 0),
-            Text = FirstLetterOfName,
-            AnchorPoint = Vector2New(0.5, 0.5),
-            BackgroundTransparency = 1,
-            Position = UDim2New(0.5, 0, 0.5, 0),
-            Size = UDim2New(1, -10, 1, -10),
-            BorderSizePixel = 0,
-            TextSize = 24,
-            BackgroundColor3 = FromRGB(255, 255, 255)
-        })
+        -- Déterminer l'image du bouton
+        local toggleImage = Window.ToggleLogo or Window.Logo
+        if toggleImage and toggleImage ~= "" then
+            -- Si c'est une URL http, on la télécharge
+            local imagePath = nil
+            if StringFind(toggleImage, "^https?://") then
+                imagePath = Library:GetImageFromURL(toggleImage)
+            elseif StringFind(toggleImage, "^rbxassetid://") then
+                imagePath = toggleImage
+            else
+                -- Sinon, on considère que c'est un chemin local ou un ID
+                imagePath = toggleImage
+            end
+
+            if imagePath then
+                local img = Instances:Create("ImageLabel", {
+                    Parent = Items["ToggleButton"].Instance,
+                    Name = "ToggleIcon",
+                    AnchorPoint = Vector2New(0.5, 0.5),
+                    Position = UDim2New(0.5, 0, 0.5, 0),
+                    Size = UDim2New(1, -8, 1, -8),  -- marges internes
+                    BackgroundTransparency = 1,
+                    Image = imagePath,
+                    ScaleType = Enum.ScaleType.Fit,
+                    BorderSizePixel = 0,
+                })
+                -- On masque le texte par défaut
+                -- On ne crée pas de TextLabel, on utilise directement l'image
+            else
+                -- Fallback : on crée un texte
+                local toggleText = Instances:Create("TextLabel", {
+                    Parent = Items["ToggleButton"].Instance,
+                    Name = "ToggleText",
+                    FontFace = Library.Font,
+                    TextColor3 = FromRGB(255, 255, 255),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Text = FirstLetterOfName,
+                    AnchorPoint = Vector2New(0.5, 0.5),
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0.5, 0, 0.5, 0),
+                    Size = UDim2New(1, -10, 1, -10),
+                    BorderSizePixel = 0,
+                    TextSize = 24,
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })
+            end
+        else
+            -- Pas d'image, on affiche la première lettre
+            local toggleText = Instances:Create("TextLabel", {
+                Parent = Items["ToggleButton"].Instance,
+                Name = "ToggleText",
+                FontFace = Library.Font,
+                TextColor3 = FromRGB(255, 255, 255),
+                BorderColor3 = FromRGB(0, 0, 0),
+                Text = FirstLetterOfName,
+                AnchorPoint = Vector2New(0.5, 0.5),
+                BackgroundTransparency = 1,
+                Position = UDim2New(0.5, 0, 0.5, 0),
+                Size = UDim2New(1, -10, 1, -10),
+                BorderSizePixel = 0,
+                TextSize = 24,
+                BackgroundColor3 = FromRGB(255, 255, 255)
+            })
+        end
 
         Items["ToggleButton"]:MakeDraggable()
         Items["ToggleButton"]:Connect("MouseButton1Down", function()

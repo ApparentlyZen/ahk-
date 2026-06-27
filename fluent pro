@@ -3837,6 +3837,7 @@ end
         end
     end
 
+    -- Ajout du bouton pour afficher/cacher le menu
     local ToggleButton = Instances:Create("TextButton", {
         Parent = Library.Holder.Instance,
         Name = "NamelessToggle",
@@ -3864,13 +3865,17 @@ end
     }):AddToTheme({Color = "Border"})
 
     -- Logique de visibilité
-    Window.Signal:Connect(function(isOpen)
-        ToggleButton.Instance.Visible = not isOpen
-    end)
+    local originalSetOpen = Window.SetOpen
+    function Window:SetOpen(Bool)
+        originalSetOpen(self, Bool) -- Appelle la fonction originale
+        ToggleButton.Instance.Visible = not Bool
+    end
 
     ToggleButton:Connect("MouseButton1Click", function()
         Window:SetOpen(true)
     end)
+    
+    ToggleButton.Instance.Visible = not Window.IsOpen
 
     Library.CreateSettingsPage = function(self, Window)
         local SettingsPage = Window:Page({Name = "Settings", Icon = "72732892493295"}) do 

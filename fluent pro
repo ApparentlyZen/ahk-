@@ -56,6 +56,8 @@ local Library do
 
         MenuKeybind = tostring(Enum.KeyCode.Z), 
 
+        IsMobile = UserInputService.TouchEnabled,
+
         Flags = { },
 
         Tween = {
@@ -130,7 +132,7 @@ local Library do
         ["Equals"]            = "=",
         ["At"]                = "@",
         ["LeftBracket"]       = "LeftBracket",
-        ["RightBracket"]      = "RightBracked",
+        ["RightBracket"]      = "RightBracket",
         ["BackSlash"]         = "BackSlash",
         ["Caret"]             = "^",
         ["Underscore"]        = "_",
@@ -1864,8 +1866,8 @@ Library.Window = function(self, Data)
         Name = Data.Name or Data.name or "Window",
         SubTitle = Data.SubTitle or Data.subtitle or "for PUBG",
         ExpiresIn = Data.ExpiresIn or Data.expiresin or "23d",
-        Logo = Data.Logo or Data.logo or nil,
-        Size = Data.Size or Data.size or UDim2.fromOffset(568, 350),
+        Logo = Data.Logo or Data.logo,
+        Size = Data.Size or Data.size or (Library.IsMobile and UDim2.fromOffset(380, 450) or UDim2.fromOffset(568, 350)),
         
         Pages = { },
         Items = { },
@@ -1967,29 +1969,39 @@ Library.Window = function(self, Data)
             BackgroundColor3 = FromRGB(255, 255, 255)
         })
 
-if Window.Logo and Window.Logo ~= "" then
-    Items["LogoImage"] = Instances:Create("ImageLabel", {
-        Parent = Items["Background"].Instance,
-        Name = "\0",
-        AnchorPoint = Vector2New(0.5, 0.5),
-        Position = UDim2New(0.5, 0, 0.5, 0),
-        BorderColor3 = FromRGB(0, 0, 0),
-        Size = UDim2New(1, 0, 1, 0),
-        BorderSizePixel = 0,
-        Image = Window.Logo,
-        BackgroundTransparency = 1,
-        ScaleType = Enum.ScaleType.Fit,
-        ZIndex = 2
-    })
-
-    local LogoCorner = Instances:Create("UICorner", {
-        Parent = Items["LogoImage"].Instance,
-        Name = "\0",
-        CornerRadius = UDimNew(0, 7)
-    })
-
-    Items["Text"].Instance.Visible = false
-end
+        if Window.Logo and Window.Logo ~= "" then
+            local logoAsset = Window.Logo
+            if type(logoAsset) == "string" and string.find(logoAsset, "http") and getcustomasset then
+                local urlParts = string.split(logoAsset, "/")
+                local fileName = urlParts[#urlParts]
+                local filePath = Library.Folders.Assets .. "/" .. fileName
+        
+                if not isfile(filePath) then
+                    local success, content = pcall(game.HttpGet, game, logoAsset)
+                    if success and content then
+                        writefile(filePath, content)
+                    end
+                end
+        
+                if isfile(filePath) then
+                    logoAsset = getcustomasset(filePath)
+                end
+            end
+        
+            Items["LogoImage"] = Instances:Create("ImageLabel", {
+                Parent = Items["Background"].Instance,
+                Name = "\0",
+                AnchorPoint = Vector2New(0.5, 0.5),
+                Position = UDim2New(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, 0, 1, 0),
+                Image = logoAsset,
+                BackgroundTransparency = 1,
+                ScaleType = Enum.ScaleType.Fit,
+                ZIndex = 2
+            })
+        
+            Items["Text"].Instance.Visible = false
+        end
         
         Items["RealTitle"] = Instances:Create("TextLabel", {
             Parent = Items["Title"].Instance,
@@ -3824,6 +3836,41 @@ end
             return Textbox 
         end
     end
+
+    local ToggleButton = Instances:Create("TextButton", {
+        Parent = Library.Holder.Instance,
+        Name = "NamelessToggle",
+        Size = UDim2.fromOffset(40, 40),
+        Position = UDim2.new(0.02, 0, 0.05, 0),
+        BackgroundColor3 = FromRGB(21, 24, 24),
+        Text = "H",
+        TextColor3 = FromRGB(255, 255, 255),
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        ZIndex = 999,
+        Visible = false -- Caché par défaut
+    })
+    ToggleButton:AddToTheme({BackgroundColor3 = "Inline"})
+
+    Instances:Create("UICorner", {
+        Parent = ToggleButton.Instance,
+        CornerRadius = UDim.new(0, 8)
+    })
+
+    Instances:Create("UIStroke", {
+        Parent = ToggleButton.Instance,
+        Color = FromRGB(30, 33, 33),
+        Thickness = 1.5
+    }):AddToTheme({Color = "Border"})
+
+    -- Logique de visibilité
+    Window.Signal:Connect(function(isOpen)
+        ToggleButton.Instance.Visible = not isOpen
+    end)
+
+    ToggleButton:Connect("MouseButton1Click", function()
+        Window:SetOpen(true)
+    end)
 
     Library.CreateSettingsPage = function(self, Window)
         local SettingsPage = Window:Page({Name = "Settings", Icon = "72732892493295"}) do 

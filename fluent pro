@@ -1928,25 +1928,35 @@ local function GetViewportSize()
 end
 
 local function MakeDraggable(object, dragObject)
-    local dragging, dragInput, dragStart, startPos
-    local function Update(input)
-        local delta = input.Position - dragStart
-        local newX = startPos.X.Offset + delta.X
-        local newY = startPos.Y.Offset + delta.Y
-        local viewport = GetViewportSize()
-        local size = object.AbsoluteSize
-        local clampedX = math.clamp(newX, size.X * object.AnchorPoint.X, viewport.X - size.X * (1 - object.AnchorPoint.X))
-        local clampedY = math.clamp(newY, size.Y * object.AnchorPoint.Y, viewport.Y - size.Y * (1 - object.AnchorPoint.Y))
-        Tween(object, {Position = UDim2.new(startPos.X.Scale, clampedX, startPos.Y.Scale, clampedY)}, 0.05)
-    end
+    local dragging = false
+    local dragStart, startPos
+
     dragObject.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not FloatLocked then
-            dragging = true dragStart = input.Position startPos = object.Position
-            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+            dragging = true
+            dragStart = input.Position
+            startPos = object.Position
         end
     end)
-    dragObject.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
-    RunService.RenderStepped:Connect(function() if dragging and dragInput then Update(dragInput) end end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+            local viewport = GetViewportSize()
+            local size = object.AbsoluteSize
+            local clampedX = math.clamp(newX, size.X * object.AnchorPoint.X, viewport.X - size.X * (1 - object.AnchorPoint.X))
+            local clampedY = math.clamp(newY, size.Y * object.AnchorPoint.Y, viewport.Y - size.Y * (1 - object.AnchorPoint.Y))
+            Tween(object, {Position = UDim2.new(startPos.X.Scale, clampedX, startPos.Y.Scale, clampedY)}, 0.05)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
 end
 
 local function MakeResizable(frame, handle)

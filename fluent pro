@@ -2158,6 +2158,9 @@ Library.Window = function(self, Data)
     
     local Debounce = false
 
+    -- Garder une référence à la fonction originale
+    local originalSetOpen
+
     function Window:SetCenter()
         local CenterPosition = Items["MainFrame"].Instance.AbsolutePosition
         task.wait()

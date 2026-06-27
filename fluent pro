@@ -1923,11 +1923,21 @@ end
 
 local FloatLocked = false
 
+local function GetViewportSize()
+    return workspace.CurrentCamera.ViewportSize
+end
+
 local function MakeDraggable(object, dragObject)
     local dragging, dragInput, dragStart, startPos
     local function Update(input)
         local delta = input.Position - dragStart
-        Tween(object, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.05)
+        local newX = startPos.X.Offset + delta.X
+        local newY = startPos.Y.Offset + delta.Y
+        local viewport = GetViewportSize()
+        local size = object.AbsoluteSize
+        local clampedX = math.clamp(newX, size.X * object.AnchorPoint.X, viewport.X - size.X * (1 - object.AnchorPoint.X))
+        local clampedY = math.clamp(newY, size.Y * object.AnchorPoint.Y, viewport.Y - size.Y * (1 - object.AnchorPoint.Y))
+        Tween(object, {Position = UDim2.new(startPos.X.Scale, clampedX, startPos.Y.Scale, clampedY)}, 0.05)
     end
     dragObject.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not FloatLocked then
@@ -1950,7 +1960,10 @@ local function MakeResizable(frame, handle)
     UserInputService.InputChanged:Connect(function(input)
         if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - startPos
-            frame.Size = UDim2.new(0, math.max(500, startSize.X + delta.X), 0, math.max(350, startSize.Y + delta.Y))
+            local viewport = GetViewportSize()
+            local newWidth = math.clamp(startSize.X + delta.X, 500, viewport.X - frame.AbsolutePosition.X)
+            local newHeight = math.clamp(startSize.Y + delta.Y, 350, viewport.Y - frame.AbsolutePosition.Y)
+            frame.Size = UDim2.new(0, newWidth, 0, newHeight)
         end
     end)
 end
@@ -2659,4 +2672,4 @@ function Library:ConfigSystem(Window)
     ThemePage:Dropdown("Theme Presets", "ThemePreset", presets, "Left", function(v) UpdateTheme(v) end)
 end
 
-return Library 
+return Library

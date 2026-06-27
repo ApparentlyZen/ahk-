@@ -537,7 +537,7 @@ local aa = {
             u("UICorner",{CornerRadius=UDim.new(0.2,0),Parent=iconBg})
             local iconImg = u("ImageLabel",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Parent=iconBg})
             u("UICorner",{CornerRadius=UDim.new(0.2,0),Parent=iconImg})
-            local defaultIco = x.GetIcon and x:GetIcon("solar/chat-round-bold")
+            local defaultIco = x.GetIcon and x:GetIcon("lucide/message-square")
             if defaultIco and type(defaultIco)=="table" then
                 iconImg.Image=defaultIco.Image or ""
                 iconImg.ImageRectOffset=defaultIco.ImageRectOffset or Vector2.new()
@@ -1389,7 +1389,7 @@ local aa = {
             section:AddSpace({Height=6})
             local InterfaceTheme=section:AddDropdown("InterfaceTheme",{
                 Title="Theme", Description="Changes the interface theme.",
-                Icon="solar/palette-bold",
+                Icon="lucide/palette",
                 Values=Library.Themes, Default=Settings.Theme,
                 IsThemeSelector=true,
                 DropdownOutsideWindow=true,
@@ -1399,30 +1399,30 @@ local aa = {
                 end
             })
             InterfaceTheme:SetValue(Settings.Theme)
-            section:AddToggle("AnimationToggle",{Title="Animated Window",Description="Enables shine/stroke animation on theme.",Icon="solar/stars-bold",Default=Settings.Animated,Callback=function(Value)
+            section:AddToggle("AnimationToggle",{Title="Animated Window",Description="Enables shine/stroke animation on theme.",Icon="lucide/sparkles",Default=Settings.Animated,Callback=function(Value)
                 getgenv().ShineEnabled=Value; Settings.Animated=Value; InterfaceManager:SaveSettings()
                 Library:SetTheme(Library.Theme)
                 if getgenv()._FluentProRefreshOpenDropdownShine then getgenv()._FluentProRefreshOpenDropdownShine() end
             end})
-            section:AddToggle("TransparentToggle",{Title="Transparency",Description="Makes the interface transparent.",Icon="solar/eye-bold",Default=Settings.Transparency,Callback=function(Value)
+            section:AddToggle("TransparentToggle",{Title="Transparency",Description="Makes the interface transparent.",Icon="lucide/eye",Default=Settings.Transparency,Callback=function(Value)
                 Library:ToggleTransparency(Value); Settings.Transparency=Value; InterfaceManager:SaveSettings()
                 if getgenv()._FluentProManagerDropdowns then
                     for _, fn in ipairs(getgenv()._FluentProManagerDropdowns) do pcall(fn) end
                 end
             end})
-            section:AddToggle("DisableBGToggle",{Title="Disable Background Images",Description="Hides theme background images.",Icon="solar/eye-closed-bold",Default=Settings.DisableBG or false,Callback=function(Value)
+            section:AddToggle("DisableBGToggle",{Title="Disable Background Images",Description="Hides theme background images.",Icon="lucide/eye-off",Default=Settings.DisableBG or false,Callback=function(Value)
                 Settings.DisableBG=Value; InterfaceManager:SaveSettings()
                 local gui=Library and Library.Window and Library.Window.AcrylicPaint
                 if gui then local bg=gui.Frame:FindFirstChild("__ThemeBG"); if bg then bg.Visible=not Value end end
             end})
             if Library.UseAcrylic then
-                section:AddToggle("AcrylicToggle",{Title="Acrylic",Description="Requires graphic quality 8+.",Icon="solar/layers-bold",Default=Settings.Acrylic,Callback=function(Value)
+                section:AddToggle("AcrylicToggle",{Title="Acrylic",Description="Requires graphic quality 8+.",Icon="lucide/layers",Default=Settings.Acrylic,Callback=function(Value)
                     Library:ToggleAcrylic(Value); Settings.Acrylic=Value; InterfaceManager:SaveSettings()
                 end})
             end
             local FontDropdown=section:AddDropdown("InterfaceFont",{
                 Title="Font Manager", Description="Changes the UI font.",
-                Icon="solar/text-bold",
+                Icon="lucide/type",
                 Values=InterfaceManager.Fonts, Default=Settings.Font or "GothamSSm",
                 DropdownOutsideWindow=true,
                 IsManagerDropdown=true,
@@ -1430,7 +1430,7 @@ local aa = {
             })
             FontDropdown:SetValue(Settings.Font or "GothamSSm")
             section:AddSpace({Height=6})
-            local MenuKeybind=section:AddKeybind("MenuKeybind",{Title="Minimize Bind",Icon="solar/keyboard-bold",Default=Settings.MenuKeybind})
+            local MenuKeybind=section:AddKeybind("MenuKeybind",{Title="Minimize Bind",Icon="lucide/keyboard",Default=Settings.MenuKeybind})
             MenuKeybind:OnChanged(function() Settings.MenuKeybind=MenuKeybind.Value; InterfaceManager:SaveSettings() end)
             Library.MinimizeKeybind=MenuKeybind
         end
@@ -1536,9 +1536,9 @@ local aa = {
         function FloatingButtonManager:BuildConfigSection(tab)
             assert(self.Library,"Must set FloatingButtonManager.Library")
             local section=tab:AddSection("Floating Buttons Config","lucide/file-type-corner")
-            section:AddInput("FB_ConfigName",{Title="Layout name",Icon="solar/widget-bold",Placeholder="Enter name..."})
-            section:AddDropdown("FB_ConfigList",{Title="Layouts list",Values=self:RefreshConfigList(),AllowNull=true,NoSearch=true,Icon="solar/list-bold",DropdownOutsideWindow=true,IsManagerDropdown=true})
-            section:AddButton({Title="Create layout",Icon="solar/diskette-bold",Callback=function()
+            section:AddInput("FB_ConfigName",{Title="Layout name",Icon="lucide/layout-grid",Placeholder="Enter name..."})
+            section:AddDropdown("FB_ConfigList",{Title="Layouts list",Values=self:RefreshConfigList(),AllowNull=true,NoSearch=true,Icon="lucide/list",DropdownOutsideWindow=true,IsManagerDropdown=true})
+            section:AddButton({Title="Create layout",Icon="lucide/save",Callback=function()
                 local name=self.Library.Options.FB_ConfigName.Value
                 if not name or name:gsub(" ","")=="" then
                     return self.Library:Notify({Title="Floating Buttons",Content="Invalid layout name",Duration=5})
@@ -1549,21 +1549,21 @@ local aa = {
                 self.Library.Options.FB_ConfigList:SetValues(self:RefreshConfigList())
                 self.Library.Options.FB_ConfigList:SetValue(nil)
             end})
-            section:AddButton({Title="Load layout",Icon="solar/upload-minimalistic-bold",Callback=function()
+            section:AddButton({Title="Load layout",Icon="lucide/upload",Callback=function()
                 local name=self.Library.Options.FB_ConfigList.Value
                 if not name or name=="" then return self.Library:Notify({Title="Floating Buttons",Content="No layout selected",Duration=5}) end
                 local ok,err=self:Load(name)
                 if not ok then return self.Library:Notify({Title="Floating Buttons",Content="Failed to load: "..tostring(err),Duration=5}) end
                 self.Library:Notify({Title="Floating Buttons",Content=string.format("Loaded layout %q",name),Duration=5})
             end})
-            section:AddButton({Title="Overwrite layout",Icon="solar/refresh-bold",Callback=function()
+            section:AddButton({Title="Overwrite layout",Icon="lucide/refresh-cw",Callback=function()
                 local name=self.Library.Options.FB_ConfigList.Value
                 if not name or name=="" then return self.Library:Notify({Title="Floating Buttons",Content="No layout selected",Duration=5}) end
                 local ok,err=self:Save(name)
                 if not ok then return self.Library:Notify({Title="Floating Buttons",Content="Failed to overwrite: "..tostring(err),Duration=5}) end
                 self.Library:Notify({Title="Floating Buttons",Content=string.format("Overwrote layout %q",name),Duration=5})
             end})
-            section:AddButton({Title="Delete layout",Icon="solar/close-circle-bold",Callback=function()
+            section:AddButton({Title="Delete layout",Icon="lucide/trash-2",Callback=function()
                 local name=self.Library.Options.FB_ConfigList.Value
                 if not name or name=="" then return self.Library:Notify({Title="Floating Buttons",Content="No layout selected",Duration=5}) end
                 local path=self.Folder.."/settings/"..name..".json"
@@ -1572,13 +1572,13 @@ local aa = {
                 self.Library.Options.FB_ConfigList:SetValues(self:RefreshConfigList())
                 self.Library.Options.FB_ConfigList:SetValue(nil)
             end})
-            section:AddButton({Title="Refresh list",Icon="solar/restart-bold",Callback=function()
+            section:AddButton({Title="Refresh list",Icon="lucide/rotate-cw",Callback=function()
                 self.Library.Options.FB_ConfigList:SetValues(self:RefreshConfigList())
                 self.Library.Options.FB_ConfigList:SetValue(nil)
             end})
             local autoPath=self.Folder.."/settings/autoload.txt"
             local AutoloadButton
-            AutoloadButton=section:AddButton({Title="Set as autoload",Icon="solar/star-bold",Description="Current autoload layout: none",Callback=function()
+            AutoloadButton=section:AddButton({Title="Set as autoload",Icon="lucide/star",Description="Current autoload layout: none",Callback=function()
                 local name=self.Library.Options.FB_ConfigList.Value
                 if isfile(autoPath) then
                     delfile(autoPath)
@@ -7064,7 +7064,7 @@ local aa = {
             local copyBtn = u("TextButton",{Size=UDim2.fromOffset(24,24),Position=UDim2.new(1,4,0,6),AnchorPoint=Vector2.new(0,0),BackgroundTransparency=0.7,Text="",ZIndex=3,Parent=wrap,ThemeTag={BackgroundColor3="Tab"}})
             u("UICorner",{CornerRadius=UDim.new(0,6),Parent=copyBtn})
             local copyIconImg = u("ImageLabel",{Size=UDim2.fromOffset(14,14),Position=UDim2.new(0.5,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),BackgroundTransparency=1,Parent=copyBtn,ThemeTag={ImageColor3="SubText"}})
-            local copyIc = d.Library and d.Library:GetIcon("solar/copy-bold")
+            local copyIc = d.Library and d.Library:GetIcon("lucide/copy")
             if copyIc and type(copyIc)=="table" then
                 copyIconImg.Image           = copyIc.Image           or ""
                 copyIconImg.ImageRectOffset = copyIc.ImageRectOffset or Vector2.new(0,0)

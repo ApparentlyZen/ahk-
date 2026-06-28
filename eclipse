@@ -85,7 +85,7 @@ end
 
 local ScreenGui = Create("ScreenGui", {
     Name = "EclipseUI",
-    Parent = game:GetService("CoreGui"),
+    Parent = CoreGui,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     ResetOnSpawn = false,
     IgnoreGuiInset = true
@@ -217,7 +217,8 @@ local MainFrame = Create("Frame", {
     Position = UDim2.new(0.5, -300, 0.5, -225),
     BackgroundColor3 = CFG.MainColor,
     BorderSizePixel = 0,
-    BackgroundTransparency = 0.3
+    BackgroundTransparency = 0.3,
+    Visible = true
 }, {
     Create("UIStroke", {Color = CFG.StrokeColor, Thickness = 1}),
     Create("UICorner", {CornerRadius = UDim.new(0, 6)})
@@ -520,12 +521,10 @@ function Library:Tab(name, icon)
                 Tween(Check, {BackgroundTransparency = Enabled and 0 or 1}, 0.1)
                 Tween(Label, {TextColor3 = Enabled and CFG.TextColor or (cfg.Risky and Color3.fromRGB(200, 80, 80) or CFG.TextDark)}, 0.1)
                 if cfg.Callback then cfg.Callback(Enabled) end
-                -- Stocker le flag
                 if cfg.Flag then Library.Flags[cfg.Flag] = Enabled end
             end
 
             Frame.MouseButton1Click:Connect(Update)
-            -- Initialiser le flag
             if cfg.Default ~= nil then
                 Enabled = cfg.Default
                 if cfg.Flag then Library.Flags[cfg.Flag] = cfg.Default end
@@ -759,6 +758,12 @@ function Library:Tab(name, icon)
                     ListFrame.Visible = true
                 else
                     ListFrame.Visible = false
+                    -- CORRECTION : vider les boutons pour éviter les traces
+                    for _, btn in pairs(optionButtons) do
+                        pcall(function() btn:Destroy() end)
+                    end
+                    optionButtons = {}
+                    optionValues = {}
                 end
             end)
 
@@ -954,6 +959,7 @@ function Library:Tab(name, icon)
                     Tween(PickerFrame, {Size = UDim2.new(0, 180, 0, 0)}, 0.2)
                     task.wait(0.2)
                     PickerFrame.Visible = false
+                    PickerFrame:Destroy()
                 end
             end)
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end

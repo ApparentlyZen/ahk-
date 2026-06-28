@@ -4,29 +4,33 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
 
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
-local ViewportSize = workspace.CurrentCamera.ViewportSize
+local ViewportSize = Workspace.CurrentCamera.ViewportSize
 
 -- ========================================================
 --  STYLE SOLIX (plus rond, plus smooth, couleurs douces)
 -- ========================================================
 local CFG = {
-    MainColor = Color3.fromRGB(15, 12, 16),      -- fond principal
-    SecondaryColor = Color3.fromRGB(22, 20, 24), -- fond secondaire
-    AccentColor = Color3.fromRGB(232, 186, 248), -- violet/rose clair
+    MainColor = Color3.fromRGB(15, 12, 16),
+    SecondaryColor = Color3.fromRGB(22, 20, 24),
+    AccentColor = Color3.fromRGB(232, 186, 248),
     TextColor = Color3.fromRGB(255, 255, 255),
     TextDark = Color3.fromRGB(185, 185, 185),
-    StrokeColor = Color3.fromRGB(41, 37, 45),    -- bordure plus contrastée
-    Font = Enum.Font.GothamBold,                 -- police plus lisible
+    StrokeColor = Color3.fromRGB(41, 37, 45),
+    Font = Enum.Font.GothamBold,
     BaseSize = Vector2.new(600, 450)
 }
 
 local Library = {
     Flags = {},
     Connections = {},
-    Unloaded = false
+    Threads = {},
+    Unloaded = false,
+    MenuKey = Enum.KeyCode.Insert,
+    LoadedScripts = {} -- pour le Script Manager
 }
 
 local function Create(class, props, children)
@@ -48,6 +52,36 @@ local function GetTextSize(text, size, font)
     return game:GetService("TextService"):GetTextSize(text, size, font, Vector2.new(10000, 10000))
 end
 
+-- ========================================================
+--  TÉLÉCHARGEMENT D'IMAGE DEPUIS UNE URL
+-- ========================================================
+function Library:GetImageFromURL(url)
+    if not url or url == "" then return nil end
+    if string.find(url, "^rbxassetid://") then return url end
+
+    local fileName = string.gsub(url, "https?://", "")
+    fileName = string.gsub(fileName, "[^%w%-%.]", "_")
+    local path = "eclipse/Assets/" .. fileName
+
+    if not isfolder("eclipse") then makefolder("eclipse") end
+    if not isfolder("eclipse/Assets") then makefolder("eclipse/Assets") end
+
+    if not isfile(path) then
+        local success, data = pcall(function()
+            return game:HttpGet(url)
+        end)
+        if success and data then
+            writefile(path, data)
+            return getcustomasset(path)
+        else
+            warn("Échec du téléchargement de l'image depuis " .. url)
+            return nil
+        end
+    else
+        return getcustomasset(path)
+    end
+end
+
 local ScreenGui = Create("ScreenGui", {
     Name = "EclipseUI",
     Parent = game:GetService("CoreGui"),
@@ -59,14 +93,14 @@ local ScreenGui = Create("ScreenGui", {
 local UIScale = Create("UIScale", {Parent = ScreenGui})
 
 local function UpdateScale()
-    local vp = workspace.CurrentCamera.ViewportSize
+    local vp = Workspace.CurrentCamera.ViewportSize
     local widthRatio = (vp.X - 40) / CFG.BaseSize.X
     local heightRatio = (vp.Y - 40) / CFG.BaseSize.Y
     local scale = math.min(widthRatio, heightRatio, 1)
     UIScale.Scale = math.max(scale, 0.6)
 end
 
-workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
+Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
 UpdateScale()
 
 local NotificationContainer = Create("Frame", {
@@ -77,7 +111,7 @@ local NotificationContainer = Create("Frame", {
     BackgroundTransparency = 1,
     ZIndex = 100
 })
-local UIListNotif = Create("UIListLayout", {
+Create("UIListLayout", {
     Parent = NotificationContainer,
     Padding = UDim.new(0, 5),
     HorizontalAlignment = Enum.HorizontalAlignment.Right,
@@ -122,6 +156,9 @@ function Library:Notify(msg, type)
     end)
 end
 
+-- ========================================================
+--  TOOLTIP
+-- ========================================================
 local TooltipLabel = Create("TextLabel", {
     Parent = ScreenGui,
     Size = UDim2.new(0, 0, 0, 20),
@@ -155,18 +192,23 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ========================================================
+--  FENÊTRE PRINCIPALE
+-- ========================================================
 local MainFrame = Create("Frame", {
     Name = "MainFrame",
     Parent = ScreenGui,
     Size = UDim2.fromOffset(CFG.BaseSize.X, CFG.BaseSize.Y),
     Position = UDim2.new(0.5, -300, 0.5, -225),
     BackgroundColor3 = CFG.MainColor,
-    BorderSizePixel = 0
+    BorderSizePixel = 0,
+    BackgroundTransparency = 0.3 -- par défaut
 }, {
     Create("UIStroke", {Color = CFG.StrokeColor, Thickness = 1}),
-    Create("UICorner", {CornerRadius = UDim.new(0, 6)})  -- Plus arrondi
+    Create("UICorner", {CornerRadius = UDim.new(0, 6)})
 })
 
+-- Dragging
 local Dragging, DragInput, DragStart, StartPos = false, nil, nil, nil
 
 MainFrame.InputBegan:Connect(function(input)
@@ -174,7 +216,6 @@ MainFrame.InputBegan:Connect(function(input)
         Dragging = true
         DragStart = input.Position
         StartPos = MainFrame.Position
-        
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 Dragging = false
@@ -196,6 +237,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- TopBar
 local TopBar = Create("Frame", {
     Parent = MainFrame,
     Size = UDim2.new(1, 0, 0, 30),
@@ -296,7 +338,7 @@ function Library:Tab(name, icon)
             Image = "rbxassetid://" .. icon,
             ImageColor3 = CFG.TextDark
         }),
-        Create("UICorner", {CornerRadius = UDim.new(0, 6)})  -- Plus arrondi
+        Create("UICorner", {CornerRadius = UDim.new(0, 6)})
     })
 
     local PageFrame = Create("ScrollingFrame", {
@@ -351,12 +393,11 @@ function Library:Tab(name, icon)
         local ParentCol = LeftSide and LeftCol or RightCol
         LeftSide = not LeftSide
 
-        -- ========== GROUPE STYLE SOLIX ==========
         local GroupFrame = Create("Frame", {
             Parent = ParentCol,
             Size = UDim2.new(1, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundColor3 = Color3.fromRGB(17, 17, 17), -- fond des groupes
+            BackgroundColor3 = Color3.fromRGB(17, 17, 17),
             BorderSizePixel = 0
         }, {
             Create("UIStroke", {Color = CFG.StrokeColor, Thickness = 1}),
@@ -416,7 +457,6 @@ function Library:Tab(name, icon)
                 Text = ""
             })
 
-            -- ========== TOGGLE STYLE SOLIX ==========
             local Box = Create("Frame", {
                 Parent = Frame,
                 Size = UDim2.new(0, 12, 0, 12),
@@ -495,7 +535,6 @@ function Library:Tab(name, icon)
                 TextXAlignment = Enum.TextXAlignment.Right
             })
 
-            -- ========== SLIDER STYLE SOLIX ==========
             local SliderBG = Create("Frame", {
                 Parent = Frame,
                 Size = UDim2.new(1, 0, 0, 6),
@@ -517,10 +556,8 @@ function Library:Tab(name, icon)
                 local SizeX = SliderBG.AbsoluteSize.X
                 local PosX = SliderBG.AbsolutePosition.X
                 local InputX = input.Position.X
-                
                 local Percent = math.clamp((InputX - PosX) / SizeX, 0, 1)
                 Value = math.floor(cfg.Min + (cfg.Max - cfg.Min) * Percent)
-                
                 Fill.Size = UDim2.new(Percent, 0, 1, 0)
                 ValueLabel.Text = Value .. (cfg.Unit or "")
                 if cfg.Callback then cfg.Callback(Value) end
@@ -572,7 +609,6 @@ function Library:Tab(name, icon)
                 TextXAlignment = Enum.TextXAlignment.Left
             })
 
-            -- ========== DROPDOWN STYLE SOLIX ==========
             local MainBox = Create("TextButton", {
                 Parent = Frame,
                 Size = UDim2.new(1, 0, 0, 20),
@@ -943,73 +979,305 @@ function Library:Tab(name, icon)
     return GroupFunctions
 end
 
--- =====================================================
---  EXEMPLE D'APPLICATION (comme dans ton script)
--- =====================================================
-local Legit = Library:Tab("Legit", 98159911363596)
-local Rage = Library:Tab("Rage", 10455604811)
-local Visuals = Library:Tab("Visuals", 10455603612)
-local Misc = Library:Tab("Misc", 11888734334)
-local Cfg = Library:Tab("Cfg", 12403097620)
-
-local AimGroup = Legit:Group("Aimbot")
-AimGroup:Toggle({Name = "Enabled", Tooltip = "Auto aim", Callback = function(v)
-    print("Aimbot:", v) 
-end})
-AimGroup:Dropdown({Name = "Priority", Options = {"Closest", "Health", "Distance"}, Default = "Closest", Callback = function(v)
-    print(v)
-end})
-AimGroup:Slider({Name = "FOV Radius", Min = 0, Max = 360, Default = 100, Unit = "°", Callback = function(v)
-    print(v)
-end})
-AimGroup:ColorPicker({Name = "Box Color", Default = Color3.fromRGB(255, 255, 255), Callback = function(c)
-    print("Box Color", c) 
-end})
-AimGroup:Textbox({Name = "Clantag", Placeholder = "Tag...", Callback = function(t)
-    print("Tag:", t) 
-end})
-AimGroup:Keybind({Name = "Menu Key", Default = Enum.KeyCode.Insert, Callback = function(k)
-    print("Pressed Key")
-end})
-AimGroup:Button({Name = "Danger", Variant = "Danger", Callback = function()
-    print("Danger")
-end})
-AimGroup:Button({Name = "Primary", Variant = "Primary", Callback = function()
-    print("Primary")
-end})
-AimGroup:Button({Name = "Button", Callback = function()
-    print("Button")
-end})
-
-Library.MenuKey = Enum.KeyCode.Insert
+-- ========================================================
+--  BOUTON FLOTTANT (TOGGLE) AVEC LOGO + DRAGGABLE
+-- ========================================================
 local Visible = true
+local FloatingButton
 
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Library.MenuKey then
+function Library:CreateFloatingButton(LogoURL)
+    FloatingButton = Create("TextButton", {
+        Parent = ScreenGui,
+        Size = UDim2.new(0, 50, 0, 50),
+        Position = UDim2.new(0.5, 0, 0, 10),
+        AnchorPoint = Vector2.new(0.5, 0),
+        BackgroundColor3 = CFG.MainColor,
+        Text = "",
+        AutoButtonColor = false,
+        ZIndex = 999
+    }, {
+        Create("UIStroke", {Color = CFG.AccentColor, Thickness = 2}),
+        Create("UICorner", {CornerRadius = UDim.new(1, 0)})
+    })
+
+    -- DRAGGABLE
+    local DragFloat, DragFloatStart, DragFloatPos = false, nil, nil
+    FloatingButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            DragFloat = true
+            DragFloatStart = input.Position
+            DragFloatPos = FloatingButton.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    DragFloat = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == DragFloat and DragFloat then
+            local delta = input.Position - DragFloatStart
+            FloatingButton.Position = UDim2.new(DragFloatPos.X.Scale, DragFloatPos.X.Offset + delta.X, DragFloatPos.Y.Scale, DragFloatPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    -- CHARGEMENT DU LOGO (URL GitHub / rbxassetid)
+    if LogoURL and LogoURL ~= "" then
+        local imagePath = Library:GetImageFromURL(LogoURL)
+        if imagePath then
+            Create("ImageLabel", {
+                Parent = FloatingButton,
+                Size = UDim2.new(1, -6, 1, -6),
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundTransparency = 1,
+                Image = imagePath,
+                ScaleType = Enum.ScaleType.Fit
+            })
+        else
+            -- Fallback : texte
+            Create("TextLabel", {
+                Parent = FloatingButton,
+                Text = "☰",
+                TextColor3 = CFG.TextColor,
+                TextSize = 22,
+                Font = CFG.Font,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 1, 0),
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.new(0.5, 0, 0.5, 0)
+            })
+        end
+    else
+        -- Fallback : texte
+        Create("TextLabel", {
+            Parent = FloatingButton,
+            Text = "☰",
+            TextColor3 = CFG.TextColor,
+            TextSize = 22,
+            Font = CFG.Font,
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 1, 0),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        })
+    end
+
+    FloatingButton.MouseButton1Click:Connect(function()
         Visible = not Visible
         MainFrame.Visible = Visible
+    end)
+end
+
+-- ========================================================
+--  UNLOAD COMPLET (KILL ALL)
+-- ========================================================
+function Library:Unload()
+    self.Unloaded = true
+    for _, conn in pairs(self.Connections) do
+        pcall(function() conn.Connection:Disconnect() end)
     end
-end)
+    for _, thread in pairs(self.Threads) do
+        pcall(function() coroutine.close(thread) end)
+    end
+    pcall(function() ScreenGui:Destroy() end)
+    self.Flags = {}
+    self.LoadedScripts = {}
+    getgenv().Library = nil
+    Library = nil
+end
 
-local MobileToggle = Create("ImageButton", {
-    Parent = ScreenGui,
-    Size = UDim2.new(0, 40, 0, 40),
-    Position = UDim2.new(0.5, 0, 0, 10),
-    AnchorPoint = Vector2.new(0.5, 0),
-    BackgroundColor3 = CFG.MainColor,
-    Image = "rbxassetid://3926305904",
-    ImageColor3 = CFG.AccentColor,
-    AutoButtonColor = false
-}, {
-    Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
-    Create("UIStroke", {Color = CFG.AccentColor, Thickness = 2})
-})
+-- ========================================================
+--  PAGE SETTINGS COMPLÈTE (Configs + Thèmes + Transparence)
+-- ========================================================
+function Library:CreateSettingsPage(Window, FloatingBtn)
+    local SettingsPage = Window:Tab("Settings", 12403097620)
 
-MobileToggle.MouseButton1Click:Connect(function()
-    Visible = not Visible
-    MainFrame.Visible = Visible
-end)
+    -- === CONFIGS ===
+    local ConfigsSection = SettingsPage:Group("Configs")
+    local ConfigSelected, ConfigName
+    local ConfigsDropdown = ConfigsSection:Dropdown({
+        Name = "Configs",
+        Items = {},
+        Default = "",
+        Callback = function(v) ConfigSelected = v end
+    })
+    ConfigsSection:Textbox({Name = "Name", Placeholder = "...", Callback = function(v) ConfigName = v end})
 
-Library:Notify("Success notify", "success")
-Library:Notify("Warning notify", "warning")
-Library:Notify("Notify")
+    local BtnGroup = ConfigsSection:Button()
+    BtnGroup:Add("Create", function()
+        if ConfigName and ConfigName ~= "" then
+            if not isfolder("eclipse/Configs") then makefolder("eclipse/Configs") end
+            writefile("eclipse/Configs/" .. ConfigName .. ".json", Library:GetConfig())
+            Library:RefreshConfigsList(ConfigsDropdown)
+        end
+    end)
+    BtnGroup:Add("Delete", function()
+        if ConfigSelected then
+            delfile("eclipse/Configs/" .. ConfigSelected)
+            Library:RefreshConfigsList(ConfigsDropdown)
+        end
+    end)
+    BtnGroup:Add("Load", function()
+        if ConfigSelected then
+            local success = Library:LoadConfig(readfile("eclipse/Configs/" .. ConfigSelected))
+            if success then Library:Notify("Config loaded!", "success") end
+        end
+    end)
+    BtnGroup:Add("Save", function()
+        if ConfigSelected then
+            writefile("eclipse/Configs/" .. ConfigSelected, Library:GetConfig())
+            Library:Notify("Config saved!", "success")
+        end
+    end)
+    ConfigsSection:Button():Add("Refresh", function() Library:RefreshConfigsList(ConfigsDropdown) end)
+
+    -- === THEMES ===
+    local ThemeSection = SettingsPage:Group("Themes")
+
+    -- Presets
+    local ThemePresets = {
+        Default = {Background=Color3.fromRGB(15,12,16), Inline=Color3.fromRGB(22,20,24), Border=Color3.fromRGB(41,37,45), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(232,186,248), Element=Color3.fromRGB(36,32,39)},
+        Halloween = {Background=Color3.fromRGB(48,24,7), Inline=Color3.fromRGB(34,14,8), Border=Color3.fromRGB(79,40,16), Text=Color3.fromRGB(195,195,195), InactiveText=Color3.fromRGB(116,116,116), Accent=Color3.fromRGB(255,98,0), Element=Color3.fromRGB(68,28,0)},
+        Aqua = {Background=Color3.fromRGB(19,21,23), Inline=Color3.fromRGB(31,35,39), Border=Color3.fromRGB(48,56,63), Text=Color3.fromRGB(245,245,245), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(31,106,181), Element=Color3.fromRGB(58,66,77)},
+        Onetap = {Background=Color3.fromRGB(51,51,51), Inline=Color3.fromRGB(30,30,30), Border=Color3.fromRGB(0,0,0), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(237,170,0), Element=Color3.fromRGB(45,45,45)},
+        Bitchbot = {Background=Color3.fromRGB(33,33,33), Inline=Color3.fromRGB(14,14,14), Border=Color3.fromRGB(0,0,0), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(158,79,249), Element=Color3.fromRGB(22,20,20)},
+        Gamesense = {Background=Color3.fromRGB(22,22,22), Inline=Color3.fromRGB(17,17,17), Border=Color3.fromRGB(37,37,37), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(211,255,53), Element=Color3.fromRGB(53,53,53)}
+    }
+
+    local PresetDropdown = ThemeSection:Dropdown({Name = "Presets", Items = {"Default","Halloween","Aqua","Onetap","Bitchbot","Gamesense"}, Default = "Default", Callback = function(val)
+        local t = ThemePresets[val]
+        if t then
+            for k, v in pairs(t) do
+                Library:ChangeTheme(k, v)
+                if Library.ThemePickers and Library.ThemePickers[k] then
+                    pcall(function() Library.ThemePickers[k]:Set(v) end)
+                end
+            end
+        end
+    end})
+
+    -- ColorPickers personnalisables
+    Library.ThemePickers = {}
+    local CustomSection = SettingsPage:Group("Customize Colors")
+    local themeKeys = {"Background", "Inline", "Border", "Text", "InactiveText", "Accent", "Element"}
+    for _, key in pairs(themeKeys) do
+        local picker = CustomSection:Label(key):Colorpicker({
+            Default = CFG[key] or Color3.fromRGB(255,255,255),
+            Callback = function(c)
+                Library:ChangeTheme(key, c)
+            end
+        })
+        Library.ThemePickers[key] = picker
+    end
+
+    -- === TRANSPARENCE ===
+    local SettingsGroup = SettingsPage:Group("UI Settings")
+    SettingsGroup:Slider({
+        Name = "Menu Opacity",
+        Min = 0,
+        Max = 100,
+        Default = 70,
+        Suffix = "%",
+        Callback = function(v)
+            MainFrame.BackgroundTransparency = 1 - (v / 100)
+        end
+    })
+
+    -- === SCRIPT MANAGER ===
+    local ScriptGroup = SettingsPage:Group("Script Manager")
+    local ScriptURL = ""
+    ScriptGroup:Textbox({Name = "Raw URL", Placeholder = "https://...", Callback = function(v) ScriptURL = v end})
+    
+    local LoadedList = {}
+    ScriptGroup:Button():Add("Load Script", function()
+        if ScriptURL and ScriptURL ~= "" then
+            local success, result = pcall(function()
+                local scriptFunc = loadstring(game:HttpGet(ScriptURL))
+                if scriptFunc then
+                    local thread = coroutine.create(scriptFunc)
+                    coroutine.resume(thread)
+                    table.insert(Library.LoadedScripts, {Thread = thread, URL = ScriptURL})
+                    Library:Notify("Script loaded!", "success")
+                end
+            end)
+            if not success then Library:Notify("Failed to load script", "warning") end
+        end
+    end)
+
+    ScriptGroup:Button():Add("Kill All Scripts", function()
+        for _, s in pairs(Library.LoadedScripts) do
+            pcall(function() coroutine.close(s.Thread) end)
+        end
+        Library.LoadedScripts = {}
+        Library:Notify("All scripts killed!", "warning")
+    end)
+
+    ScriptGroup:Button({Variant = "Danger"}):Add("KILL ALL (Hard Reset)", function()
+        Library:Unload()
+    end)
+end
+
+-- ========================================================
+--  RACCOURCIS / HELPERS
+-- ========================================================
+function Library:ChangeTheme(key, color)
+    CFG[key] = color
+    -- Met à jour tous les éléments en temps réel (simple refresh)
+    for _, item in pairs(Library.ThemeItems or {}) do
+        if item.Properties and item.Properties[key] then
+            pcall(function() item.Item[key] = color end)
+        end
+    end
+end
+
+function Library:GetConfig()
+    return HttpService:JSONEncode(Library.Flags)
+end
+
+function Library:LoadConfig(json)
+    local success, data = pcall(HttpService.JSONDecode, HttpService, json)
+    if success and data then
+        for k, v in pairs(data) do
+            Library.Flags[k] = v
+        end
+        return true
+    end
+    return false
+end
+
+function Library:RefreshConfigsList(dropdown)
+    if not isfolder("eclipse/Configs") then makefolder("eclipse/Configs") end
+    local list = {}
+    for _, file in pairs(listfiles("eclipse/Configs")) do
+        local name = string.match(file, "([^/]+)%.json$")
+        if name then table.insert(list, name) end
+    end
+    dropdown:Refresh(list)
+end
+
+-- ========================================================
+--  UTILISATION : FENÊTRE PRINCIPALE + BOUTON
+-- ========================================================
+function Library:Window(logoUrl)
+    MainFrame.Visible = true
+    self:CreateFloatingButton(logoUrl)
+
+    -- Touche Insert
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if not gpe and input.KeyCode == Library.MenuKey then
+            Visible = not Visible
+            MainFrame.Visible = Visible
+        end
+    end)
+
+    return {
+        Tab = function(_, name, icon) return Library:Tab(name, icon) end,
+        CreateSettingsPage = function(_, win) return Library:CreateSettingsPage(win) end,
+        Notify = function(_, msg, type) Library:Notify(msg, type) end
+    }
+end
+
+-- On garde le ScreenGui et le MainFrame en mémoire
+return Library

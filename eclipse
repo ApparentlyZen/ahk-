@@ -520,9 +520,18 @@ function Library:Tab(name, icon)
                 Tween(Check, {BackgroundTransparency = Enabled and 0 or 1}, 0.1)
                 Tween(Label, {TextColor3 = Enabled and CFG.TextColor or (cfg.Risky and Color3.fromRGB(200, 80, 80) or CFG.TextDark)}, 0.1)
                 if cfg.Callback then cfg.Callback(Enabled) end
+                -- Stocker le flag
+                if cfg.Flag then Library.Flags[cfg.Flag] = Enabled end
             end
 
             Frame.MouseButton1Click:Connect(Update)
+            -- Initialiser le flag
+            if cfg.Default ~= nil then
+                Enabled = cfg.Default
+                if cfg.Flag then Library.Flags[cfg.Flag] = cfg.Default end
+                Tween(Check, {BackgroundTransparency = Enabled and 0 or 1}, 0.1)
+                Tween(Label, {TextColor3 = Enabled and CFG.TextColor or (cfg.Risky and Color3.fromRGB(200, 80, 80) or CFG.TextDark)}, 0.1)
+            end
             return {Set = function(v) if v ~= Enabled then Update() end end}
         end
 
@@ -583,6 +592,7 @@ function Library:Tab(name, icon)
                 Value = math.floor(cfg.Min + (cfg.Max - cfg.Min) * Percent)
                 Fill.Size = UDim2.new(Percent, 0, 1, 0)
                 ValueLabel.Text = Value .. (cfg.Unit or "")
+                if cfg.Flag then Library.Flags[cfg.Flag] = Value end
                 if cfg.Callback then cfg.Callback(Value) end
             end
 
@@ -607,12 +617,13 @@ function Library:Tab(name, icon)
 
             local percent = (Value - cfg.Min) / (cfg.Max - cfg.Min)
             Fill.Size = UDim2.new(percent, 0, 1, 0)
+            if cfg.Flag then Library.Flags[cfg.Flag] = Value
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
         end
 
         function ItemFuncs:Dropdown(cfg)
             local Expanded = false
-            local Current = cfg.Default or cfg.Options[1]
+            local Current = cfg.Default or (cfg.Options and cfg.Options[1]) or ""
 
             local Frame = Create("Frame", {
                 Parent = Content,
@@ -684,30 +695,53 @@ function Library:Tab(name, icon)
 
             local options = cfg.Options or cfg.Items or {}
             local optionButtons = {}
-            for _, opt in pairs(options) do
-                local Btn = Create("TextButton", {
-                    Parent = ListFrame,
-                    Size = UDim2.new(1, 0, 0, 20),
-                    BackgroundTransparency = 1,
-                    Text = opt,
-                    TextColor3 = (opt == Current) and CFG.AccentColor or CFG.TextDark,
-                    TextSize = 11,
-                    Font = CFG.Font
-                })
-                Btn.MouseButton1Click:Connect(function()
-                    Current = opt
-                    MainBox.Val.Text = opt
-                    if cfg.Callback then cfg.Callback(opt) end
-                    Expanded = false
-                    ListFrame.Visible = false
-                end)
-                table.insert(optionButtons, Btn)
+            local optionValues = {}
+
+            local function RefreshDropdownOptions(newOptions)
+                -- Supprimer les anciens boutons
+                for _, btn in pairs(optionButtons) do
+                    pcall(function() btn:Destroy() end)
+                end
+                optionButtons = {}
+                optionValues = {}
+
+                for _, opt in pairs(newOptions) do
+                    local Btn = Create("TextButton", {
+                        Parent = ListFrame,
+                        Size = UDim2.new(1, 0, 0, 20),
+                        BackgroundTransparency = 1,
+                        Text = opt,
+                        TextColor3 = (opt == Current) and CFG.AccentColor or CFG.TextDark,
+                        TextSize = 11,
+                        Font = CFG.Font
+                    })
+                    Btn.MouseButton1Click:Connect(function()
+                        Current = opt
+                        MainBox.Val.Text = opt
+                        if cfg.Flag then Library.Flags[cfg.Flag] = opt end
+                        if cfg.Callback then cfg.Callback(opt) end
+                        Expanded = false
+                        ListFrame.Visible = false
+                    end)
+                    table.insert(optionButtons, Btn)
+                    table.insert(optionValues, opt)
+                end
+
+                -- Réinitialiser Current si l'option n'existe plus
+                if not table.find(optionValues, Current) then
+                    Current = optionValues[1] or ""
+                    MainBox.Val.Text = Current
+                    if cfg.Flag then Library.Flags[cfg.Flag] = Current end
+                end
             end
+
+            -- Ajouter les options initiales
+            RefreshDropdownOptions(options)
 
             MainBox.MouseButton1Click:Connect(function()
                 Expanded = not Expanded
                 if Expanded then
-                    local count = #options
+                    local count = #optionValues
                     local maxHeight = math.min(count * 20, 100)
                     ListFrame.Size = UDim2.new(0, MainBox.AbsoluteSize.X, 0, maxHeight)
 
@@ -730,44 +764,21 @@ function Library:Tab(name, icon)
 
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
 
-            -- Exposer une méthode Refresh
+            -- Initialiser le flag
+            if cfg.Flag and Current then Library.Flags[cfg.Flag] = Current end
+
             local dropdownObj = {
                 Refresh = function(self, newOptions)
-                    -- Supprimer les anciens boutons
-                    for _, btn in pairs(optionButtons) do
-                        pcall(function() btn:Destroy() end)
-                    end
-                    optionButtons = {}
-                    -- Ajouter les nouvelles options
-                    for _, opt in pairs(newOptions) do
-                        local Btn = Create("TextButton", {
-                            Parent = ListFrame,
-                            Size = UDim2.new(1, 0, 0, 20),
-                            BackgroundTransparency = 1,
-                            Text = opt,
-                            TextColor3 = (opt == Current) and CFG.AccentColor or CFG.TextDark,
-                            TextSize = 11,
-                            Font = CFG.Font
-                        })
-                        Btn.MouseButton1Click:Connect(function()
-                            Current = opt
-                            MainBox.Val.Text = opt
-                            if cfg.Callback then cfg.Callback(opt) end
-                            Expanded = false
-                            ListFrame.Visible = false
-                        end)
-                        table.insert(optionButtons, Btn)
-                    end
-                    -- Réinitialiser Current si l'option n'existe plus
-                    if not table.find(newOptions, Current) then
-                        Current = newOptions[1] or ""
-                        MainBox.Val.Text = Current
-                    end
+                    RefreshDropdownOptions(newOptions)
                 end,
-                Set = function(self, val) -- méthode Set pour la compatibilité
+                Set = function(self, val)
                     Current = val
                     MainBox.Val.Text = val
+                    if cfg.Flag then Library.Flags[cfg.Flag] = val end
                     if cfg.Callback then cfg.Callback(val) end
+                end,
+                Get = function(self)
+                    return Current
                 end
             }
 
@@ -886,12 +897,14 @@ function Library:Tab(name, icon)
                 Preview.BackgroundColor3 = Color
                 SatValPanel.BackgroundColor3 = Color3.fromHSV(H, 1, 1)
                 Cursor.Position = UDim2.new(S, 0, 1 - V, 0)
+                if cfg.Flag then Library.Flags[cfg.Flag] = {Color = Color:ToHex(), Alpha = 1} end
                 if cfg.Callback then cfg.Callback(Color) end
             end
 
             Cursor.Position = UDim2.new(S, 0, 1 - V, 0)
             SatValPanel.BackgroundColor3 = Color3.fromHSV(H, 1, 1)
             Preview.BackgroundColor3 = Color
+            if cfg.Flag then Library.Flags[cfg.Flag] = {Color = Color:ToHex(), Alpha = 1} end
 
             SatValPanel.InputBegan:Connect(function(inp) 
                 if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then 
@@ -952,6 +965,8 @@ function Library:Tab(name, icon)
                     Preview.BackgroundColor3 = Color
                     SatValPanel.BackgroundColor3 = Color3.fromHSV(H, 1, 1)
                     Cursor.Position = UDim2.new(S, 0, 1 - V, 0)
+                    if cfg.Flag then Library.Flags[cfg.Flag] = {Color = Color:ToHex(), Alpha = 1} end
+                    if cfg.Callback then cfg.Callback(Color) end
                 end
             }
             return pickerObj
@@ -993,7 +1008,9 @@ function Library:Tab(name, icon)
             })
 
             Box.FocusLost:Connect(function()
-                if cfg.Callback then cfg.Callback(Box.Text) end
+                local value = Box.Text
+                if cfg.Flag then Library.Flags[cfg.Flag] = value end
+                if cfg.Callback then cfg.Callback(value) end
             end)
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
         end
@@ -1046,6 +1063,7 @@ function Library:Tab(name, icon)
                     Key = inp.KeyCode
                     Btn.Text = Key.Name
                     Btn.TextColor3 = CFG.TextDark
+                    if cfg.Flag then Library.Flags[cfg.Flag] = {Key = tostring(Key), Mode = cfg.Mode or "Toggle"} end
                     if cfg.Callback then cfg.Callback(Key) end
                 end
             end)
@@ -1208,7 +1226,7 @@ function Library:CreateSettingsPage(Window)
     local ConfigSelected, ConfigName
     local ConfigsDropdown = ConfigsSection:Dropdown({
         Name = "Configs",
-        Items = {},
+        Options = {},
         Default = "",
         Callback = function(v) ConfigSelected = v end
     })
@@ -1217,29 +1235,47 @@ function Library:CreateSettingsPage(Window)
     ConfigsSection:Button({Name = "Create", Callback = function()
         if ConfigName and ConfigName ~= "" then
             if not isfolder("eclipse/Configs") then makefolder("eclipse/Configs") end
-            writefile("eclipse/Configs/" .. ConfigName .. ".json", Library:GetConfig())
+            local configData = Library:GetConfig()
+            writefile("eclipse/Configs/" .. ConfigName .. ".json", configData)
             Library:RefreshConfigsList(ConfigsDropdown)
+            Library:Notify("Config created!", "success")
+        else
+            Library:Notify("Enter a name!", "warning")
         end
     end})
     ConfigsSection:Button({Name = "Delete", Callback = function()
         if ConfigSelected then
             delfile("eclipse/Configs/" .. ConfigSelected)
             Library:RefreshConfigsList(ConfigsDropdown)
+            Library:Notify("Config deleted!", "success")
+        else
+            Library:Notify("Select a config!", "warning")
         end
     end})
     ConfigsSection:Button({Name = "Load", Callback = function()
         if ConfigSelected then
             local success = Library:LoadConfig(readfile("eclipse/Configs/" .. ConfigSelected))
-            if success then Library:Notify("Config loaded!", "success") end
+            if success then 
+                Library:Notify("Config loaded!", "success")
+            else
+                Library:Notify("Failed to load config!", "warning")
+            end
+        else
+            Library:Notify("Select a config!", "warning")
         end
     end})
     ConfigsSection:Button({Name = "Save", Callback = function()
         if ConfigSelected then
             writefile("eclipse/Configs/" .. ConfigSelected, Library:GetConfig())
             Library:Notify("Config saved!", "success")
+        else
+            Library:Notify("Select a config!", "warning")
         end
     end})
-    ConfigsSection:Button({Name = "Refresh", Callback = function() Library:RefreshConfigsList(ConfigsDropdown) end})
+    ConfigsSection:Button({Name = "Refresh", Callback = function() 
+        Library:RefreshConfigsList(ConfigsDropdown)
+        Library:Notify("List refreshed!", "success")
+    end})
 
     -- === THEMES ===
     local ThemeSection = SettingsPage:Group("Themes")
@@ -1314,9 +1350,13 @@ function Library:CreateSettingsPage(Window)
                         coroutine.resume(thread)
                         table.insert(Library.LoadedScripts, {Thread = thread, URL = ScriptURL})
                         Library:Notify("Script loaded!", "success")
+                    else
+                        Library:Notify("Invalid script!", "warning")
                     end
                 end)
                 if not success then Library:Notify("Failed to load script", "warning") end
+            else
+                Library:Notify("Enter a URL!", "warning")
             end
         end
     })
@@ -1382,8 +1422,6 @@ function Library:RefreshConfigsList(dropdown)
     end
     if dropdown and dropdown.Refresh then
         dropdown:Refresh(list)
-    else
-        warn("Dropdown Refresh method not found")
     end
 end
 

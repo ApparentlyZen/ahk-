@@ -104,6 +104,9 @@ end
 Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
 UpdateScale()
 
+-- ========================================================
+--  NOTIFICATIONS
+-- ========================================================
 local NotificationContainer = Create("Frame", {
     Parent = ScreenGui,
     Position = UDim2.new(1, -20, 0, 20),
@@ -192,6 +195,17 @@ RunService.RenderStepped:Connect(function()
         TooltipLabel.Position = UDim2.fromOffset(m.X + 15, m.Y + 15)
     end
 end)
+
+-- ========================================================
+--  CONTENEUR GLOBAL POUR DROPDOWNS
+-- ========================================================
+local DropdownContainer = Create("Frame", {
+    Parent = ScreenGui,
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    ZIndex = 999,
+    ClipsDescendants = false
+})
 
 -- ========================================================
 --  FENÊTRE PRINCIPALE
@@ -356,7 +370,7 @@ function Library:Tab(name, icon)
         AutomaticCanvasSize = Enum.AutomaticSize.Y
     })
 
-    local Padding = Create("UIPadding", {Parent = PageFrame, PaddingTop = UDim.new(0, 15), PaddingLeft = UDim.new(0, 15), PaddingRight = UDim.new(0, 15), PaddingBottom = UDim.new(0, 15)})
+    Create("UIPadding", {Parent = PageFrame, PaddingTop = UDim.new(0, 15), PaddingLeft = UDim.new(0, 15), PaddingRight = UDim.new(0, 15), PaddingBottom = UDim.new(0, 15)})
     
     local LeftCol = Create("Frame", {
         Parent = PageFrame, 
@@ -650,15 +664,15 @@ function Library:Tab(name, icon)
                 })
             })
 
-            -- ===== CORRECTION DROPDOWN : POSITION ADAPTATIVE =====
+            -- ListFrame parenté au DropdownContainer global
             local ListFrame = Create("ScrollingFrame", {
-                Parent = MainBox,
-                Size = UDim2.new(1, 0, 0, 0),
-                Position = UDim2.new(0, 0, 1, 2), -- par défaut en dessous
+                Parent = DropdownContainer,
+                Size = UDim2.new(0, 0, 0, 0),
+                Position = UDim2.new(0, 0, 0, 0),
                 BackgroundColor3 = CFG.SecondaryColor,
                 BorderSizePixel = 0,
                 Visible = false,
-                ZIndex = 50,
+                ZIndex = 999,
                 CanvasSize = UDim2.new(0, 0, 0, 0),
                 AutomaticCanvasSize = Enum.AutomaticSize.Y,
                 ScrollBarThickness = 2
@@ -684,8 +698,6 @@ function Library:Tab(name, icon)
                     MainBox.Val.Text = opt
                     if cfg.Callback then cfg.Callback(opt) end
                     Expanded = false
-                    Tween(ListFrame, {Size = UDim2.new(1, 0, 0, 0)}, 0.1)
-                    task.wait(0.1)
                     ListFrame.Visible = false
                 end)
             end
@@ -693,31 +705,27 @@ function Library:Tab(name, icon)
             MainBox.MouseButton1Click:Connect(function()
                 Expanded = not Expanded
                 if Expanded then
-                    ListFrame.Visible = true
                     local count = #options
                     local maxHeight = math.min(count * 20, 100)
+                    ListFrame.Size = UDim2.new(0, MainBox.AbsoluteSize.X, 0, maxHeight)
 
-                    -- Calcul de l'espace disponible sous le bouton
                     local absPos = MainBox.AbsolutePosition
-                    local absSize = MainBox.AbsoluteSize
                     local screenHeight = Workspace.CurrentCamera.ViewportSize.Y
-                    local spaceBelow = screenHeight - (absPos.Y + absSize.Y + 10)
-                    local spaceAbove = absPos.Y - 10
+                    local spaceBelow = screenHeight - (absPos.Y + MainBox.AbsoluteSize.Y + 5)
+                    local spaceAbove = absPos.Y - 5
 
-                    -- Si la liste ne tient pas en dessous, on l'ouvre vers le haut
                     if maxHeight > spaceBelow and spaceAbove > maxHeight then
-                        ListFrame.Position = UDim2.new(0, 0, 0, -maxHeight - 5)
+                        ListFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y - maxHeight - 5)
                     else
-                        ListFrame.Position = UDim2.new(0, 0, 1, 2)
+                        ListFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + MainBox.AbsoluteSize.Y + 5)
                     end
 
-                    Tween(ListFrame, {Size = UDim2.new(1, 0, 0, maxHeight)}, 0.1)
+                    ListFrame.Visible = true
                 else
-                    Tween(ListFrame, {Size = UDim2.new(1, 0, 0, 0)}, 0.1)
-                    task.wait(0.1)
                     ListFrame.Visible = false
                 end
             end)
+
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
         end
 
@@ -821,7 +829,6 @@ function Library:Tab(name, icon)
             })
 
             local H, S, V = Color:ToHSV()
-            -- Correction : s'assurer que H n'est pas nil
             H = H or 0
             S = S or 1
             V = V or 1
@@ -836,7 +843,6 @@ function Library:Tab(name, icon)
                 if cfg.Callback then cfg.Callback(Color) end
             end
 
-            -- Position initiale
             Cursor.Position = UDim2.new(S, 0, 1 - V, 0)
             SatValPanel.BackgroundColor3 = Color3.fromHSV(H, 1, 1)
             Preview.BackgroundColor3 = Color
@@ -888,7 +894,6 @@ function Library:Tab(name, icon)
             end)
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
             
-            -- Retourne un objet avec une méthode Set pour les mises à jour externes
             local pickerObj = {
                 Set = function(_, newColor)
                     Color = newColor
@@ -1131,7 +1136,6 @@ function Library:Unload()
     for _, thread in pairs(self.Threads) do
         pcall(function() coroutine.close(thread) end)
     end
-    -- Fermeture des scripts chargés par le Script Manager
     for _, s in pairs(self.LoadedScripts) do
         pcall(function() coroutine.close(s.Thread) end)
     end
@@ -1143,7 +1147,7 @@ function Library:Unload()
 end
 
 -- ========================================================
---  PAGE SETTINGS COMPLÈTE (Configs + Thèmes + Transparence + Script Manager)
+--  PAGE SETTINGS COMPLÈTE
 -- ========================================================
 function Library:CreateSettingsPage(Window)
     local SettingsPage = Window:Tab("Settings", 12403097620)
@@ -1159,43 +1163,43 @@ function Library:CreateSettingsPage(Window)
     })
     ConfigsSection:Textbox({Name = "Name", Placeholder = "...", Callback = function(v) ConfigName = v end})
 
-    ConfigsSection:Button({Name = "Create Config", Callback = function()
+    ConfigsSection:Button({Name = "Create", Callback = function()
         if ConfigName and ConfigName ~= "" then
             if not isfolder("eclipse/Configs") then makefolder("eclipse/Configs") end
             writefile("eclipse/Configs/" .. ConfigName .. ".json", Library:GetConfig())
             Library:RefreshConfigsList(ConfigsDropdown)
         end
     end})
-    ConfigsSection:Button({Name = "Delete Config", Callback = function()
+    ConfigsSection:Button({Name = "Delete", Callback = function()
         if ConfigSelected then
             delfile("eclipse/Configs/" .. ConfigSelected)
             Library:RefreshConfigsList(ConfigsDropdown)
         end
     end})
-    ConfigsSection:Button({Name = "Load Config", Callback = function()
+    ConfigsSection:Button({Name = "Load", Callback = function()
         if ConfigSelected then
             local success = Library:LoadConfig(readfile("eclipse/Configs/" .. ConfigSelected))
             if success then Library:Notify("Config loaded!", "success") end
         end
     end})
-    ConfigsSection:Button({Name = "Save Config", Callback = function()
+    ConfigsSection:Button({Name = "Save", Callback = function()
         if ConfigSelected then
             writefile("eclipse/Configs/" .. ConfigSelected, Library:GetConfig())
             Library:Notify("Config saved!", "success")
         end
     end})
-    ConfigsSection:Button({Name = "Refresh List", Callback = function() Library:RefreshConfigsList(ConfigsDropdown) end})
+    ConfigsSection:Button({Name = "Refresh", Callback = function() Library:RefreshConfigsList(ConfigsDropdown) end})
 
-    -- === THEMES (Theme Manager) ===
+    -- === THEMES ===
     local ThemeSection = SettingsPage:Group("Themes")
 
     local ThemePresets = {
-        Default = {Background=Color3.fromRGB(15,12,16), Inline=Color3.fromRGB(22,20,24), Border=Color3.fromRGB(41,37,45), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(232,186,248), Element=Color3.fromRGB(36,32,39)},
-        Halloween = {Background=Color3.fromRGB(48,24,7), Inline=Color3.fromRGB(34,14,8), Border=Color3.fromRGB(79,40,16), Text=Color3.fromRGB(195,195,195), InactiveText=Color3.fromRGB(116,116,116), Accent=Color3.fromRGB(255,98,0), Element=Color3.fromRGB(68,28,0)},
-        Aqua = {Background=Color3.fromRGB(19,21,23), Inline=Color3.fromRGB(31,35,39), Border=Color3.fromRGB(48,56,63), Text=Color3.fromRGB(245,245,245), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(31,106,181), Element=Color3.fromRGB(58,66,77)},
-        Onetap = {Background=Color3.fromRGB(51,51,51), Inline=Color3.fromRGB(30,30,30), Border=Color3.fromRGB(0,0,0), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(237,170,0), Element=Color3.fromRGB(45,45,45)},
-        Bitchbot = {Background=Color3.fromRGB(33,33,33), Inline=Color3.fromRGB(14,14,14), Border=Color3.fromRGB(0,0,0), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(158,79,249), Element=Color3.fromRGB(22,20,20)},
-        Gamesense = {Background=Color3.fromRGB(22,22,22), Inline=Color3.fromRGB(17,17,17), Border=Color3.fromRGB(37,37,37), Text=Color3.fromRGB(255,255,255), InactiveText=Color3.fromRGB(185,185,185), Accent=Color3.fromRGB(211,255,53), Element=Color3.fromRGB(53,53,53)}
+        Default = {MainColor=Color3.fromRGB(15,12,16), SecondaryColor=Color3.fromRGB(22,20,24), StrokeColor=Color3.fromRGB(41,37,45), TextColor=Color3.fromRGB(255,255,255), TextDark=Color3.fromRGB(185,185,185), AccentColor=Color3.fromRGB(232,186,248)},
+        Halloween = {MainColor=Color3.fromRGB(48,24,7), SecondaryColor=Color3.fromRGB(34,14,8), StrokeColor=Color3.fromRGB(79,40,16), TextColor=Color3.fromRGB(195,195,195), TextDark=Color3.fromRGB(116,116,116), AccentColor=Color3.fromRGB(255,98,0)},
+        Aqua = {MainColor=Color3.fromRGB(19,21,23), SecondaryColor=Color3.fromRGB(31,35,39), StrokeColor=Color3.fromRGB(48,56,63), TextColor=Color3.fromRGB(245,245,245), TextDark=Color3.fromRGB(185,185,185), AccentColor=Color3.fromRGB(31,106,181)},
+        Onetap = {MainColor=Color3.fromRGB(51,51,51), SecondaryColor=Color3.fromRGB(30,30,30), StrokeColor=Color3.fromRGB(0,0,0), TextColor=Color3.fromRGB(255,255,255), TextDark=Color3.fromRGB(185,185,185), AccentColor=Color3.fromRGB(237,170,0)},
+        Bitchbot = {MainColor=Color3.fromRGB(33,33,33), SecondaryColor=Color3.fromRGB(14,14,14), StrokeColor=Color3.fromRGB(0,0,0), TextColor=Color3.fromRGB(255,255,255), TextDark=Color3.fromRGB(185,185,185), AccentColor=Color3.fromRGB(158,79,249)},
+        Gamesense = {MainColor=Color3.fromRGB(22,22,22), SecondaryColor=Color3.fromRGB(17,17,17), StrokeColor=Color3.fromRGB(37,37,37), TextColor=Color3.fromRGB(255,255,255), TextDark=Color3.fromRGB(185,185,185), AccentColor=Color3.fromRGB(211,255,53)}
     }
 
     ThemeSection:Dropdown({
@@ -1215,7 +1219,7 @@ function Library:CreateSettingsPage(Window)
         end
     })
 
-    -- === CUSTOMIZE COLORS (corrigé) ===
+    -- === CUSTOMIZE COLORS ===
     local CustomSection = SettingsPage:Group("Customize Colors")
     local themeKeys = {"MainColor", "SecondaryColor", "StrokeColor", "TextColor", "TextDark", "AccentColor"}
     
@@ -1287,7 +1291,7 @@ function Library:CreateSettingsPage(Window)
 end
 
 -- ========================================================
---  RACCOURCIS / HELPERS
+--  HELPERS
 -- ========================================================
 function Library:ChangeTheme(key, color)
     CFG[key] = color

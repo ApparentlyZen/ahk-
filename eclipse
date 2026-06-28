@@ -764,7 +764,7 @@ function Library:Tab(name, icon)
                 Create("ImageLabel", {
                     Size = UDim2.new(1, 0, 1, 0),
                     BackgroundTransparency = 1,
-                    Image = "rbxassetid://4801885019"
+                    Image = "rbxassetid://4801885019" -- Saturation
                 }),
                 Create("ImageLabel", {
                     Size = UDim2.new(1, 0, 1, 0),
@@ -999,6 +999,7 @@ local FloatingButton
 
 function Library:CreateFloatingButton(LogoURL)
     FloatingButton = Create("TextButton", {
+        Name = "FloatingToggleButton",
         Parent = ScreenGui,
         Size = UDim2.new(0, 50, 0, 50),
         Position = UDim2.new(0.5, 0, 0, 10),
@@ -1006,17 +1007,17 @@ function Library:CreateFloatingButton(LogoURL)
         BackgroundColor3 = CFG.MainColor,
         Text = "",
         AutoButtonColor = false,
-        ZIndex = 999,
+        ZIndex = 9999,
         ClipsDescendants = true
     }, {
         Create("UIStroke", {Color = CFG.AccentColor, Thickness = 2}),
         Create("UICorner", {CornerRadius = UDim.new(1, 0)})
     })
 
-    -- DRAGGABLE
+    -- DRAGGABLE LOGIC
     local DragFloat, DragFloatStart, DragFloatPos = false, nil, nil
     FloatingButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not input.UserInputType == Enum.UserInputType.RightMouseClick then
             DragFloat = true
             DragFloatStart = input.Position
             DragFloatPos = FloatingButton.Position
@@ -1029,7 +1030,7 @@ function Library:CreateFloatingButton(LogoURL)
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if input == DragFloat and DragFloat then
+        if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             local delta = input.Position - DragFloatStart
             FloatingButton.Position = UDim2.new(DragFloatPos.X.Scale, DragFloatPos.X.Offset + delta.X, DragFloatPos.Y.Scale, DragFloatPos.Y.Offset + delta.Y)
         end
@@ -1037,7 +1038,7 @@ function Library:CreateFloatingButton(LogoURL)
 
     -- CHARGEMENT DU LOGO
     if LogoURL and LogoURL ~= "" then
-        local imagePath = Library:GetImageFromURL(LogoURL)
+        local imagePath = self:GetImageFromURL(LogoURL)
         if imagePath then
             Create("ImageLabel", {
                 Parent = FloatingButton,
@@ -1242,6 +1243,7 @@ function Library:CreateSettingsPage(Window)
         Callback = function()
             for _, s in pairs(Library.LoadedScripts) do
                 pcall(function() coroutine.close(s.Thread) end)
+                pcall(function() s.Connection:Disconnect() end)
             end
             Library.LoadedScripts = {}
             Library:Notify("All scripts killed!", "warning")
@@ -1264,7 +1266,7 @@ function Library:ChangeTheme(key, color)
     CFG[key] = color
     if key == "MainColor" then
         MainFrame.BackgroundColor3 = color
-    elseif key == "SecondaryColor" then
+    elseif key == "SecondaryColor" and TopBar then
         TopBar.BackgroundColor3 = color
     elseif key == "AccentColor" then
         if FloatingButton then
@@ -1304,7 +1306,7 @@ end
 --  FENÊTRE PRINCIPALE
 -- ========================================================
 function Library:Window(logoUrl)
-    MainFrame.Visible = true
+    MainFrame.Visible = false
     self:CreateFloatingButton(logoUrl)
 
     UserInputService.InputBegan:Connect(function(input, gpe)

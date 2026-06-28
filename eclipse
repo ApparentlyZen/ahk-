@@ -197,7 +197,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ========================================================
---  CONTENEUR GLOBAL POUR DROPDOWNS
+--  CONTENEUR GLOBAL POUR DROPDOWNS ET COLORPICKERS
 -- ========================================================
 local DropdownContainer = Create("Frame", {
     Parent = ScreenGui,
@@ -683,6 +683,7 @@ function Library:Tab(name, icon)
             })
 
             local options = cfg.Options or cfg.Items or {}
+            local optionButtons = {}
             for _, opt in pairs(options) do
                 local Btn = Create("TextButton", {
                     Parent = ListFrame,
@@ -700,6 +701,7 @@ function Library:Tab(name, icon)
                     Expanded = false
                     ListFrame.Visible = false
                 end)
+                table.insert(optionButtons, Btn)
             end
 
             MainBox.MouseButton1Click:Connect(function()
@@ -727,6 +729,49 @@ function Library:Tab(name, icon)
             end)
 
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
+
+            -- Exposer une méthode Refresh
+            local dropdownObj = {
+                Refresh = function(self, newOptions)
+                    -- Supprimer les anciens boutons
+                    for _, btn in pairs(optionButtons) do
+                        pcall(function() btn:Destroy() end)
+                    end
+                    optionButtons = {}
+                    -- Ajouter les nouvelles options
+                    for _, opt in pairs(newOptions) do
+                        local Btn = Create("TextButton", {
+                            Parent = ListFrame,
+                            Size = UDim2.new(1, 0, 0, 20),
+                            BackgroundTransparency = 1,
+                            Text = opt,
+                            TextColor3 = (opt == Current) and CFG.AccentColor or CFG.TextDark,
+                            TextSize = 11,
+                            Font = CFG.Font
+                        })
+                        Btn.MouseButton1Click:Connect(function()
+                            Current = opt
+                            MainBox.Val.Text = opt
+                            if cfg.Callback then cfg.Callback(opt) end
+                            Expanded = false
+                            ListFrame.Visible = false
+                        end)
+                        table.insert(optionButtons, Btn)
+                    end
+                    -- Réinitialiser Current si l'option n'existe plus
+                    if not table.find(newOptions, Current) then
+                        Current = newOptions[1] or ""
+                        MainBox.Val.Text = Current
+                    end
+                end,
+                Set = function(self, val) -- méthode Set pour la compatibilité
+                    Current = val
+                    MainBox.Val.Text = val
+                    if cfg.Callback then cfg.Callback(val) end
+                end
+            }
+
+            return dropdownObj
         end
 
         function ItemFuncs:ColorPicker(cfg)
@@ -764,15 +809,16 @@ function Library:Tab(name, icon)
                 Create("UICorner", {CornerRadius = UDim.new(0, 3)})
             })
 
+            -- PickerFrame maintenant parenté au DropdownContainer (global)
             local PickerFrame = Create("Frame", {
-                Parent = Preview,
+                Parent = DropdownContainer,
                 Size = UDim2.new(0, 180, 0, 0),
-                Position = UDim2.new(1, 0, 1, 5),
-                AnchorPoint = Vector2.new(1, 0),
+                Position = UDim2.new(0, 0, 0, 0),
                 BackgroundColor3 = CFG.MainColor,
                 BorderSizePixel = 0,
                 ClipsDescendants = true,
-                ZIndex = 60
+                ZIndex = 999,
+                Visible = false
             }, {
                 Create("UIStroke", {Color = CFG.StrokeColor, Thickness = 1}),
                 Create("UICorner", {CornerRadius = UDim.new(0, 4)})
@@ -887,9 +933,14 @@ function Library:Tab(name, icon)
             Preview.MouseButton1Click:Connect(function()
                 Opened = not Opened
                 if Opened then
+                    PickerFrame.Visible = true
+                    local absPos = Preview.AbsolutePosition
+                    PickerFrame.Position = UDim2.new(0, absPos.X - 180 + 30, 0, absPos.Y + 20)
                     Tween(PickerFrame, {Size = UDim2.new(0, 180, 0, 170)}, 0.2)
                 else
                     Tween(PickerFrame, {Size = UDim2.new(0, 180, 0, 0)}, 0.2)
+                    task.wait(0.2)
+                    PickerFrame.Visible = false
                 end
             end)
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
@@ -1329,7 +1380,11 @@ function Library:RefreshConfigsList(dropdown)
         local name = string.match(file, "([^/]+)%.json$")
         if name then table.insert(list, name) end
     end
-    if dropdown.Refresh then dropdown:Refresh(list) end
+    if dropdown and dropdown.Refresh then
+        dropdown:Refresh(list)
+    else
+        warn("Dropdown Refresh method not found")
+    end
 end
 
 -- ========================================================

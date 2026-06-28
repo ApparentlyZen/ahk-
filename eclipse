@@ -212,8 +212,7 @@ local MainFrame = Create("Frame", {
 local Dragging, DragInput, DragStart, StartPos = false, nil, nil, nil
 
 MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-    input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
         DragStart = input.Position
         StartPos = MainFrame.Position
@@ -651,10 +650,11 @@ function Library:Tab(name, icon)
                 })
             })
 
+            -- ===== CORRECTION DROPDOWN : POSITION ADAPTATIVE =====
             local ListFrame = Create("ScrollingFrame", {
                 Parent = MainBox,
                 Size = UDim2.new(1, 0, 0, 0),
-                Position = UDim2.new(0, 0, 1, 2),
+                Position = UDim2.new(0, 0, 1, 2), -- par défaut en dessous
                 BackgroundColor3 = CFG.SecondaryColor,
                 BorderSizePixel = 0,
                 Visible = false,
@@ -668,7 +668,8 @@ function Library:Tab(name, icon)
                 Create("UICorner", {CornerRadius = UDim.new(0, 4)})
             })
 
-            for _, opt in pairs(cfg.Options or cfg.Items or {}) do
+            local options = cfg.Options or cfg.Items or {}
+            for _, opt in pairs(options) do
                 local Btn = Create("TextButton", {
                     Parent = ListFrame,
                     Size = UDim2.new(1, 0, 0, 20),
@@ -693,8 +694,24 @@ function Library:Tab(name, icon)
                 Expanded = not Expanded
                 if Expanded then
                     ListFrame.Visible = true
-                    local optionsCount = #(cfg.Options or cfg.Items or {})
-                    Tween(ListFrame, {Size = UDim2.new(1, 0, 0, math.min(optionsCount * 20, 100))}, 0.1)
+                    local count = #options
+                    local maxHeight = math.min(count * 20, 100)
+
+                    -- Calcul de l'espace disponible sous le bouton
+                    local absPos = MainBox.AbsolutePosition
+                    local absSize = MainBox.AbsoluteSize
+                    local screenHeight = Workspace.CurrentCamera.ViewportSize.Y
+                    local spaceBelow = screenHeight - (absPos.Y + absSize.Y + 10)
+                    local spaceAbove = absPos.Y - 10
+
+                    -- Si la liste ne tient pas en dessous, on l'ouvre vers le haut
+                    if maxHeight > spaceBelow and spaceAbove > maxHeight then
+                        ListFrame.Position = UDim2.new(0, 0, 0, -maxHeight - 5)
+                    else
+                        ListFrame.Position = UDim2.new(0, 0, 1, 2)
+                    end
+
+                    Tween(ListFrame, {Size = UDim2.new(1, 0, 0, maxHeight)}, 0.1)
                 else
                     Tween(ListFrame, {Size = UDim2.new(1, 0, 0, 0)}, 0.1)
                     task.wait(0.1)
@@ -764,7 +781,7 @@ function Library:Tab(name, icon)
                 Create("ImageLabel", {
                     Size = UDim2.new(1, 0, 1, 0),
                     BackgroundTransparency = 1,
-                    Image = "rbxassetid://4801885019" -- Saturation
+                    Image = "rbxassetid://4801885019"
                 }),
                 Create("ImageLabel", {
                     Size = UDim2.new(1, 0, 1, 0),
@@ -803,7 +820,12 @@ function Library:Tab(name, icon)
                 Create("UICorner", {CornerRadius = UDim.new(0, 2)})
             })
 
-            local H, S, V = 0, 1, 1
+            local H, S, V = Color:ToHSV()
+            -- Correction : s'assurer que H n'est pas nil
+            H = H or 0
+            S = S or 1
+            V = V or 1
+
             local DraggingHSV, DraggingHue = false, false
 
             local function UpdateColor()
@@ -813,6 +835,11 @@ function Library:Tab(name, icon)
                 Cursor.Position = UDim2.new(S, 0, 1 - V, 0)
                 if cfg.Callback then cfg.Callback(Color) end
             end
+
+            -- Position initiale
+            Cursor.Position = UDim2.new(S, 0, 1 - V, 0)
+            SatValPanel.BackgroundColor3 = Color3.fromHSV(H, 1, 1)
+            Preview.BackgroundColor3 = Color
 
             SatValPanel.InputBegan:Connect(function(inp) 
                 if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then 
@@ -860,7 +887,18 @@ function Library:Tab(name, icon)
                 end
             end)
             if cfg.Tooltip then AddTooltip(Frame, cfg.Tooltip) end
-            return {Set = function(_, newColor) Color = newColor; Preview.BackgroundColor3 = newColor end}
+            
+            -- Retourne un objet avec une méthode Set pour les mises à jour externes
+            local pickerObj = {
+                Set = function(_, newColor)
+                    Color = newColor
+                    H, S, V = Color:ToHSV()
+                    Preview.BackgroundColor3 = Color
+                    SatValPanel.BackgroundColor3 = Color3.fromHSV(H, 1, 1)
+                    Cursor.Position = UDim2.new(S, 0, 1 - V, 0)
+                end
+            }
+            return pickerObj
         end
 
         function ItemFuncs:Textbox(cfg)
@@ -999,7 +1037,6 @@ local FloatingButton
 
 function Library:CreateFloatingButton(LogoURL)
     FloatingButton = Create("TextButton", {
-        Name = "FloatingToggleButton",
         Parent = ScreenGui,
         Size = UDim2.new(0, 50, 0, 50),
         Position = UDim2.new(0.5, 0, 0, 10),
@@ -1007,17 +1044,17 @@ function Library:CreateFloatingButton(LogoURL)
         BackgroundColor3 = CFG.MainColor,
         Text = "",
         AutoButtonColor = false,
-        ZIndex = 9999,
+        ZIndex = 999,
         ClipsDescendants = true
     }, {
         Create("UIStroke", {Color = CFG.AccentColor, Thickness = 2}),
         Create("UICorner", {CornerRadius = UDim.new(1, 0)})
     })
 
-    -- DRAGGABLE LOGIC
+    -- DRAGGABLE
     local DragFloat, DragFloatStart, DragFloatPos = false, nil, nil
     FloatingButton.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not input.UserInputType == Enum.UserInputType.RightMouseClick then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             DragFloat = true
             DragFloatStart = input.Position
             DragFloatPos = FloatingButton.Position
@@ -1030,7 +1067,7 @@ function Library:CreateFloatingButton(LogoURL)
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input == DragFloat and DragFloat then
             local delta = input.Position - DragFloatStart
             FloatingButton.Position = UDim2.new(DragFloatPos.X.Scale, DragFloatPos.X.Offset + delta.X, DragFloatPos.Y.Scale, DragFloatPos.Y.Offset + delta.Y)
         end
@@ -1038,7 +1075,7 @@ function Library:CreateFloatingButton(LogoURL)
 
     -- CHARGEMENT DU LOGO
     if LogoURL and LogoURL ~= "" then
-        local imagePath = self:GetImageFromURL(LogoURL)
+        local imagePath = Library:GetImageFromURL(LogoURL)
         if imagePath then
             Create("ImageLabel", {
                 Parent = FloatingButton,
@@ -1094,15 +1131,19 @@ function Library:Unload()
     for _, thread in pairs(self.Threads) do
         pcall(function() coroutine.close(thread) end)
     end
+    -- Fermeture des scripts chargés par le Script Manager
+    for _, s in pairs(self.LoadedScripts) do
+        pcall(function() coroutine.close(s.Thread) end)
+    end
+    self.LoadedScripts = {}
     pcall(function() ScreenGui:Destroy() end)
     self.Flags = {}
-    self.LoadedScripts = {}
     getgenv().Library = nil
     Library = nil
 end
 
 -- ========================================================
---  PAGE SETTINGS COMPLÈTE (Configs + Thèmes + Transparence)
+--  PAGE SETTINGS COMPLÈTE (Configs + Thèmes + Transparence + Script Manager)
 -- ========================================================
 function Library:CreateSettingsPage(Window)
     local SettingsPage = Window:Tab("Settings", 12403097620)
@@ -1118,44 +1159,31 @@ function Library:CreateSettingsPage(Window)
     })
     ConfigsSection:Textbox({Name = "Name", Placeholder = "...", Callback = function(v) ConfigName = v end})
 
-    -- Ici nous créons un bouton standard car l'ancienne méthode appelait des fonctions invalides
-    ConfigsSection:Button({
-        Name = "Create Config",
-        Callback = function()
-            if ConfigName and ConfigName ~= "" then
-                if not isfolder("eclipse/Configs") then makefolder("eclipse/Configs") end
-                writefile("eclipse/Configs/" .. ConfigName .. ".json", Library:GetConfig())
-                Library:RefreshConfigsList(ConfigsDropdown)
-            end
+    ConfigsSection:Button({Name = "Create Config", Callback = function()
+        if ConfigName and ConfigName ~= "" then
+            if not isfolder("eclipse/Configs") then makefolder("eclipse/Configs") end
+            writefile("eclipse/Configs/" .. ConfigName .. ".json", Library:GetConfig())
+            Library:RefreshConfigsList(ConfigsDropdown)
         end
-    })
-    ConfigsSection:Button({
-        Name = "Delete Config",
-        Callback = function()
-            if ConfigSelected then
-                delfile("eclipse/Configs/" .. ConfigSelected)
-                Library:RefreshConfigsList(ConfigsDropdown)
-            end
+    end})
+    ConfigsSection:Button({Name = "Delete Config", Callback = function()
+        if ConfigSelected then
+            delfile("eclipse/Configs/" .. ConfigSelected)
+            Library:RefreshConfigsList(ConfigsDropdown)
         end
-    })
-    ConfigsSection:Button({
-        Name = "Load Config",
-        Callback = function()
-            if ConfigSelected then
-                local success = Library:LoadConfig(readfile("eclipse/Configs/" .. ConfigSelected))
-                if success then Library:Notify("Config loaded!", "success") end
-            end
+    end})
+    ConfigsSection:Button({Name = "Load Config", Callback = function()
+        if ConfigSelected then
+            local success = Library:LoadConfig(readfile("eclipse/Configs/" .. ConfigSelected))
+            if success then Library:Notify("Config loaded!", "success") end
         end
-    })
-    ConfigsSection:Button({
-        Name = "Save Config",
-        Callback = function()
-            if ConfigSelected then
-                writefile("eclipse/Configs/" .. ConfigSelected, Library:GetConfig())
-                Library:Notify("Config saved!", "success")
-            end
+    end})
+    ConfigsSection:Button({Name = "Save Config", Callback = function()
+        if ConfigSelected then
+            writefile("eclipse/Configs/" .. ConfigSelected, Library:GetConfig())
+            Library:Notify("Config saved!", "success")
         end
-    })
+    end})
     ConfigsSection:Button({Name = "Refresh List", Callback = function() Library:RefreshConfigsList(ConfigsDropdown) end})
 
     -- === THEMES (Theme Manager) ===
@@ -1187,7 +1215,7 @@ function Library:CreateSettingsPage(Window)
         end
     })
 
-    -- === CUSTOMIZE COLORS ===
+    -- === CUSTOMIZE COLORS (corrigé) ===
     local CustomSection = SettingsPage:Group("Customize Colors")
     local themeKeys = {"MainColor", "SecondaryColor", "StrokeColor", "TextColor", "TextDark", "AccentColor"}
     
@@ -1243,7 +1271,6 @@ function Library:CreateSettingsPage(Window)
         Callback = function()
             for _, s in pairs(Library.LoadedScripts) do
                 pcall(function() coroutine.close(s.Thread) end)
-                pcall(function() s.Connection:Disconnect() end)
             end
             Library.LoadedScripts = {}
             Library:Notify("All scripts killed!", "warning")
@@ -1266,7 +1293,7 @@ function Library:ChangeTheme(key, color)
     CFG[key] = color
     if key == "MainColor" then
         MainFrame.BackgroundColor3 = color
-    elseif key == "SecondaryColor" and TopBar then
+    elseif key == "SecondaryColor" then
         TopBar.BackgroundColor3 = color
     elseif key == "AccentColor" then
         if FloatingButton then
@@ -1298,7 +1325,6 @@ function Library:RefreshConfigsList(dropdown)
         local name = string.match(file, "([^/]+)%.json$")
         if name then table.insert(list, name) end
     end
-    -- Si une fonction rafraîchir existe sur ton composant
     if dropdown.Refresh then dropdown:Refresh(list) end
 end
 
@@ -1306,7 +1332,7 @@ end
 --  FENÊTRE PRINCIPALE
 -- ========================================================
 function Library:Window(logoUrl)
-    MainFrame.Visible = false
+    MainFrame.Visible = true
     self:CreateFloatingButton(logoUrl)
 
     UserInputService.InputBegan:Connect(function(input, gpe)

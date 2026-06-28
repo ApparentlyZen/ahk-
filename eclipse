@@ -30,7 +30,8 @@ local Library = {
     Threads = {},
     Unloaded = false,
     MenuKey = Enum.KeyCode.Insert,
-    LoadedScripts = {} -- pour le Script Manager
+    LoadedScripts = {},
+    ThemePickers = {}
 }
 
 local function Create(class, props, children)
@@ -202,13 +203,12 @@ local MainFrame = Create("Frame", {
     Position = UDim2.new(0.5, -300, 0.5, -225),
     BackgroundColor3 = CFG.MainColor,
     BorderSizePixel = 0,
-    BackgroundTransparency = 0.3 -- par défaut
+    BackgroundTransparency = 0.3
 }, {
     Create("UIStroke", {Color = CFG.StrokeColor, Thickness = 1}),
     Create("UICorner", {CornerRadius = UDim.new(0, 6)})
 })
 
--- Dragging
 local Dragging, DragInput, DragStart, StartPos = false, nil, nil, nil
 
 MainFrame.InputBegan:Connect(function(input)
@@ -237,7 +237,6 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- TopBar
 local TopBar = Create("Frame", {
     Parent = MainFrame,
     Size = UDim2.new(1, 0, 0, 30),
@@ -980,7 +979,7 @@ function Library:Tab(name, icon)
 end
 
 -- ========================================================
---  BOUTON FLOTTANT (TOGGLE) AVEC LOGO + DRAGGABLE
+--  BOUTON FLOTTANT (TOGGLE) AVEC LOGO QUI REMPLIT TOUT
 -- ========================================================
 local Visible = true
 local FloatingButton
@@ -994,10 +993,11 @@ function Library:CreateFloatingButton(LogoURL)
         BackgroundColor3 = CFG.MainColor,
         Text = "",
         AutoButtonColor = false,
-        ZIndex = 999
+        ZIndex = 999,
+        ClipsDescendants = true  -- Important pour rogner l'image selon le coin rond
     }, {
         Create("UIStroke", {Color = CFG.AccentColor, Thickness = 2}),
-        Create("UICorner", {CornerRadius = UDim.new(1, 0)})
+        Create("UICorner", {CornerRadius = UDim.new(1, 0)})  -- Bouton rond
     })
 
     -- DRAGGABLE
@@ -1022,21 +1022,22 @@ function Library:CreateFloatingButton(LogoURL)
         end
     end)
 
-    -- CHARGEMENT DU LOGO (URL GitHub / rbxassetid)
+    -- CHARGEMENT DU LOGO (remplit tout le bouton)
     if LogoURL and LogoURL ~= "" then
         local imagePath = Library:GetImageFromURL(LogoURL)
         if imagePath then
             Create("ImageLabel", {
                 Parent = FloatingButton,
-                Size = UDim2.new(1, -6, 1, -6),
+                Size = UDim2.new(1, 0, 1, 0),  -- 100% du bouton
                 Position = UDim2.new(0.5, 0, 0.5, 0),
                 AnchorPoint = Vector2.new(0.5, 0.5),
                 BackgroundTransparency = 1,
                 Image = imagePath,
-                ScaleType = Enum.ScaleType.Fit
+                ScaleType = Enum.ScaleType.Crop,  -- <--- MODIFICATION : REMPLIT TOUT
+                BorderSizePixel = 0
             })
         else
-            -- Fallback : texte
+            -- Fallback : icône texte
             Create("TextLabel", {
                 Parent = FloatingButton,
                 Text = "☰",
@@ -1050,7 +1051,7 @@ function Library:CreateFloatingButton(LogoURL)
             })
         end
     else
-        -- Fallback : texte
+        -- Fallback : icône texte
         Create("TextLabel", {
             Parent = FloatingButton,
             Text = "☰",
@@ -1091,7 +1092,7 @@ end
 -- ========================================================
 --  PAGE SETTINGS COMPLÈTE (Configs + Thèmes + Transparence)
 -- ========================================================
-function Library:CreateSettingsPage(Window, FloatingBtn)
+function Library:CreateSettingsPage(Window)
     local SettingsPage = Window:Tab("Settings", 12403097620)
 
     -- === CONFIGS ===
@@ -1133,7 +1134,7 @@ function Library:CreateSettingsPage(Window, FloatingBtn)
     end)
     ConfigsSection:Button():Add("Refresh", function() Library:RefreshConfigsList(ConfigsDropdown) end)
 
-    -- === THEMES ===
+    -- === THEMES (Theme Manager) ===
     local ThemeSection = SettingsPage:Group("Themes")
 
     -- Presets
@@ -1158,8 +1159,7 @@ function Library:CreateSettingsPage(Window, FloatingBtn)
         end
     end})
 
-    -- ColorPickers personnalisables
-    Library.ThemePickers = {}
+    -- Customize Colors (personnalisation)
     local CustomSection = SettingsPage:Group("Customize Colors")
     local themeKeys = {"Background", "Inline", "Border", "Text", "InactiveText", "Accent", "Element"}
     for _, key in pairs(themeKeys) do
@@ -1190,7 +1190,6 @@ function Library:CreateSettingsPage(Window, FloatingBtn)
     local ScriptURL = ""
     ScriptGroup:Textbox({Name = "Raw URL", Placeholder = "https://...", Callback = function(v) ScriptURL = v end})
     
-    local LoadedList = {}
     ScriptGroup:Button():Add("Load Script", function()
         if ScriptURL and ScriptURL ~= "" then
             local success, result = pcall(function()
@@ -1224,7 +1223,6 @@ end
 -- ========================================================
 function Library:ChangeTheme(key, color)
     CFG[key] = color
-    -- Met à jour tous les éléments en temps réel (simple refresh)
     for _, item in pairs(Library.ThemeItems or {}) do
         if item.Properties and item.Properties[key] then
             pcall(function() item.Item[key] = color end)
@@ -1258,13 +1256,12 @@ function Library:RefreshConfigsList(dropdown)
 end
 
 -- ========================================================
---  UTILISATION : FENÊTRE PRINCIPALE + BOUTON
+--  FENÊTRE PRINCIPALE
 -- ========================================================
 function Library:Window(logoUrl)
     MainFrame.Visible = true
     self:CreateFloatingButton(logoUrl)
 
-    -- Touche Insert
     UserInputService.InputBegan:Connect(function(input, gpe)
         if not gpe and input.KeyCode == Library.MenuKey then
             Visible = not Visible
@@ -1279,5 +1276,4 @@ function Library:Window(logoUrl)
     }
 end
 
--- On garde le ScreenGui et le MainFrame en mémoire
 return Library

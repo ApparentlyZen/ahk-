@@ -1156,7 +1156,7 @@ function _Catalyst:Window(opt)
     local Window = {}
 
     -- =========================================================
-    -- SPLASH SCREEN ANIMÉ (AVEC TON IMAGE EN FOND)
+    -- SPLASH SCREEN (image nette, sans flou)
     -- =========================================================
     local splashScreen = Instance.new("Frame")
     splashScreen.Size = UDim2.new(1, 0, 1, 0)
@@ -1168,25 +1168,19 @@ function _Catalyst:Window(opt)
     local splashImage = Instance.new("ImageLabel")
     splashImage.Size = UDim2.new(1, 0, 1, 0)
     splashImage.BackgroundTransparency = 1
-    splashImage.ImageTransparency = 0.4
-    splashImage.ScaleType = Enum.ScaleType.Crop
+    splashImage.ImageTransparency = 0.15  -- très léger voile, image nette
+    splashImage.ScaleType = Enum.ScaleType.Fit  -- préserve le ratio, pas de crop flou
     splashImage.ZIndex = 101
     splashImage.Parent = splashScreen
 
-    -- Méthode de chargement compatible (comme dans ton autre script)
-    local logoUrl = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
-    taskLib.spawn(function()
-        pcall(function()
-            if writefile and getcustomasset and game.HttpGet then
-                if not isfile("catalyst_splash.webp") then
-                    writefile("catalyst_splash.webp", game:HttpGet(logoUrl))
-                end
-                splashImage.Image = getcustomasset("catalyst_splash.webp")
-            else
-                splashImage.Image = logoUrl
-            end
-        end)
-    end)
+    -- Couche de fond semi-transparente pour lisibilité du texte
+    local overlay = Instance.new("Frame")
+    overlay.Size = UDim2.new(1, 0, 1, 0)
+    overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    overlay.BackgroundTransparency = 0.3
+    overlay.BorderSizePixel = 0
+    overlay.ZIndex = 101
+    overlay.Parent = splashScreen
 
     local splashTitle = Instance.new("TextLabel")
     splashTitle.Size = UDim2.new(0, 400, 0, 50)
@@ -1221,10 +1215,25 @@ function _Catalyst:Window(opt)
     splashAccentLine.ZIndex = 102
     splashAccentLine.Parent = splashScreen
 
-    -- Animation d'apparition
+    -- Chargement de l'image (méthode compatible)
+    local logoUrl = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
+    taskLib.spawn(function()
+        pcall(function()
+            if writefile and getcustomasset and game.HttpGet then
+                if not isfile("catalyst_splash.webp") then
+                    writefile("catalyst_splash.webp", game:HttpGet(logoUrl))
+                end
+                splashImage.Image = getcustomasset("catalyst_splash.webp")
+            else
+                splashImage.Image = logoUrl
+            end
+        end)
+    end)
+
+    -- Animation
     taskLib.spawn(function()
         taskLib.wait(0.2)
-        tween(splashImage, 1.2, { ImageTransparency = 0.1 })
+        tween(splashImage, 1.2, { ImageTransparency = 0.05 })  -- plus opaque
         tween(splashTitle, 0.8, { TextTransparency = 0 })
         tween(splashSub, 0.8, { TextTransparency = 0.6 })
         tween(splashAccentLine, 1.0, { Size = UDim2.new(0, 250, 0, 2) })
@@ -1233,6 +1242,7 @@ function _Catalyst:Window(opt)
         -- Disparition
         tween(splashScreen, 0.8, { BackgroundTransparency = 1 })
         tween(splashImage, 0.8, { ImageTransparency = 1 })
+        tween(overlay, 0.8, { BackgroundTransparency = 1 })
         tween(splashTitle, 0.5, { TextTransparency = 1 })
         tween(splashSub, 0.5, { TextTransparency = 1 })
         tween(splashAccentLine, 0.5, { BackgroundTransparency = 1 })
@@ -1242,7 +1252,7 @@ function _Catalyst:Window(opt)
     end)
 
     -- =========================================================
-    -- INTERFACE PRINCIPALE (identique à avant)
+    -- INTERFACE PRINCIPALE
     -- =========================================================
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
@@ -1771,16 +1781,15 @@ function _Catalyst:Window(opt)
     sApi:Label(FileSystem.hasIO and "File system: available" or "File system: in-memory only")
     sApi:Label(IS_MOBILE and "Mode: mobile / touch" or "Mode: desktop")
 
+    -- =========================================================
+    -- BOUTON MOBILE (FAB) avec chargement dynamique depuis GitHub
+    -- =========================================================
     if IS_MOBILE then
-        local FAB_IMAGE_ID = "rbxassetid://122765407222246" -- Ton icône personnalisée
-
         local fab = Instance.new("ImageButton")
         fab.Size = UDim2.new(0, 48, 0, 48)
         fab.Position = UDim2.new(0, 16, 0.5, -24)
         fab.BackgroundColor3 = Theme.Panel
         fab.AutoButtonColor = false
-        fab.Image = FAB_IMAGE_ID
-        fab.ImageColor3 = Color3.fromRGB(255, 255, 255)
         fab.ScaleType = Enum.ScaleType.Fit
         fab.BackgroundTransparency = 0
         fab.Parent = ScreenGui
@@ -1789,6 +1798,22 @@ function _Catalyst:Window(opt)
         ring.Thickness = 2
         ring.Parent = fab
         regAccent(ring, "Color")
+
+        -- Chargement de l'image (même méthode que le splash)
+        local fabUrl = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
+        taskLib.spawn(function()
+            pcall(function()
+                if writefile and getcustomasset and game.HttpGet then
+                    if not isfile("catalyst_fab.webp") then
+                        writefile("catalyst_fab.webp", game:HttpGet(fabUrl))
+                    end
+                    fab.Image = getcustomasset("catalyst_fab.webp")
+                else
+                    -- fallback : ID Roblox (au cas où)
+                    fab.Image = "rbxassetid://122765407222246"
+                end
+            end)
+        end)
 
         fab.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1

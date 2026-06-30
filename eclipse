@@ -1,4 +1,4 @@
--- _Catalyst GX 2.2 (Full Theme System - Everything Recolored)
+-- _Catalyst GX 2.2 (Full Theme + Drag Fixed + Complete)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -31,7 +31,7 @@ local function alive() return genv.__CatalystGen == MY_GEN end
 local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
 -- =========================================================
--- PRESET THEMES (12 magnifiques)
+-- 12 PRESET THEMES
 -- =========================================================
 local PresetThemes = {
     Default = {
@@ -173,14 +173,14 @@ for k, v in pairs(PresetThemes.Default) do Theme[k] = v end
 _Catalyst.Theme = Theme
 
 -- =========================================================
--- THEME SYSTEM (réellement complet)
+-- THEME SYSTEM
 -- =========================================================
-local ThemeTagged = {}      -- {obj, prop}
+local ThemeObjects = {}
 
-local function tagTheme(obj, prop)
-    table.insert(ThemeTagged, {obj = obj, prop = prop})
-    if Theme[prop] then
-        pcall(function() obj[prop] = Theme[prop] end)
+local function registerThemeObject(obj, themeKey, propName)
+    table.insert(ThemeObjects, {obj = obj, themeKey = themeKey, prop = propName})
+    if Theme[themeKey] then
+        pcall(function() obj[propName] = Theme[themeKey] end)
     end
 end
 
@@ -188,18 +188,15 @@ local function applyTheme(customTheme)
     if not customTheme then return end
     if type(customTheme) == "string" then
         local preset = PresetThemes[customTheme]
-        if preset then
-            for k, v in pairs(preset) do Theme[k] = v end
-        end
+        if preset then for k, v in pairs(preset) do Theme[k] = v end end
     elseif type(customTheme) == "table" then
         for k, v in pairs(customTheme) do
             if Theme[k] and typeof(v) == "Color3" then Theme[k] = v end
         end
     end
-    -- Mettre à jour tous les éléments enregistrés
-    for _, tag in ipairs(ThemeTagged) do
-        if tag.obj and tag.obj.Parent and Theme[tag.prop] then
-            pcall(function() tag.obj[tag.prop] = Theme[tag.prop] end)
+    for _, entry in ipairs(ThemeObjects) do
+        if entry.obj and entry.obj.Parent and Theme[entry.themeKey] then
+            pcall(function() entry.obj[entry.prop] = Theme[entry.themeKey] end)
         end
     end
 end
@@ -207,26 +204,6 @@ end
 -- =========================================================
 -- HELPERS
 -- =========================================================
-local AccentObjects   = {}
-local AccentListeners = {}
-local function regAccent(obj, prop)
-    AccentObjects[#AccentObjects + 1] = { obj = obj, prop = prop }
-    obj[prop] = Theme.Accent
-    return obj
-end
-local function onAccent(fn)
-    AccentListeners[#AccentListeners + 1] = fn
-end
-local function setAccent(c)
-    Theme.Accent = c
-    for _, e in ipairs(AccentObjects) do
-        if e.obj and e.obj.Parent then
-            pcall(function() e.obj[e.prop] = c end)
-        end
-    end
-    for _, fn in ipairs(AccentListeners) do pcall(fn, c) end
-end
-
 local function corner(o, r)
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, r or 6)
@@ -240,7 +217,7 @@ local function stroke(o, col, th, tr)
     s.Transparency = tr or 0
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     s.Parent = o
-    tagTheme(s, "Color")  -- pour que le stroke change de couleur
+    registerThemeObject(s, "Stroke", "Color")
     return s
 end
 local function tween(o, t, props, st, dir)
@@ -262,35 +239,26 @@ local function pad(o, all)
     return p
 end
 
--- Drag fiable (barre de titre + bords)
-local function makeDrag(target, getMainFrame)
-    local dragStartInput, dragStartPos
-    local dragConn
-    target.InputBegan:Connect(function(input)
+local function makeDrag(handle, getMainFrame)
+    local dragInput, startPos, startMouse
+    handle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragStartInput = input.Position
-            dragStartPos = getMainFrame().Position
-            dragConn = RunService.RenderStepped:Connect(function()
-                if dragStartInput then
-                    local delta = UserInputService:GetMouseLocation() - dragStartInput
-                    local newPos = UDim2.new(
-                        dragStartPos.X.Scale,
-                        math.floor(dragStartPos.X.Offset + delta.X / 2) * 2,
-                        dragStartPos.Y.Scale,
-                        math.floor(dragStartPos.Y.Offset + delta.Y / 2) * 2
-                    )
-                    getMainFrame().Position = newPos
-                else
-                    dragConn:Disconnect()
-                end
-            end)
+            dragInput = input
+            startPos = getMainFrame().Position
+            startMouse = input.Position
         end
     end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragStartInput = nil
-            if dragConn then dragConn:Disconnect() end
+    handle.InputChanged:Connect(function(input)
+        if input == dragInput then
+            local delta = input.Position - startMouse
+            getMainFrame().Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
+    end)
+    handle.InputEnded:Connect(function(input)
+        if input == dragInput then dragInput = nil end
     end)
 end
 
@@ -299,82 +267,46 @@ local function roundTo(n, d)
     return math.floor(n * m + 0.5) / m
 end
 
--- =========================================================
--- FILE SYSTEM (inchangé)
--- =========================================================
 local FileSystem = {}
 do
-    local hasIO = (typeof(writefile) == "function")
-        and (typeof(readfile) == "function")
-        and (typeof(isfile) == "function")
+    local hasIO = (typeof(writefile) == "function") and (typeof(readfile) == "function") and (typeof(isfile) == "function")
     local mem = {}
     function FileSystem.write(path, data)
         if hasIO then pcall(writefile, path, data) else mem[path] = data end
     end
     function FileSystem.read(path)
-        if hasIO then
-            local r
-            pcall(function() r = readfile(path) end)
-            return r
-        else
-            return mem[path]
-        end
+        if hasIO then local r; pcall(function() r = readfile(path) end); return r else return mem[path] end
     end
     function FileSystem.exists(path)
-        if hasIO then
-            local r = false
-            pcall(function() r = isfile(path) end)
-            return r
-        else
-            return mem[path] ~= nil
-        end
+        if hasIO then local r = false; pcall(function() r = isfile(path) end); return r else return mem[path] ~= nil end
     end
     function FileSystem.delete(path)
-        if hasIO and typeof(delfile) == "function" then
-            pcall(delfile, path)
-        else
-            mem[path] = nil
-        end
+        if hasIO and typeof(delfile) == "function" then pcall(delfile, path) else mem[path] = nil end
     end
     function FileSystem.list(folder)
         local out = {}
         if hasIO and typeof(listfiles) == "function" then
-            local files
-            pcall(function() files = listfiles(folder) end)
+            local files; pcall(function() files = listfiles(folder) end)
             if files then for _, f in ipairs(files) do out[#out + 1] = f end end
-        else
-            for k in pairs(mem) do out[#out + 1] = k end
-        end
+        else for k in pairs(mem) do out[#out + 1] = k end end
         return out
     end
     function FileSystem.makeFolder(folder)
         if hasIO and typeof(makefolder) == "function" then
-            pcall(function()
-                if not (typeof(isfolder) == "function" and isfolder(folder)) then
-                    makefolder(folder)
-                end
-            end)
+            pcall(function() if not (typeof(isfolder) == "function" and isfolder(folder)) then makefolder(folder) end end)
         end
     end
     FileSystem.hasIO = hasIO
 end
 
 local GUI_NAME = "_CatalystLib"
-
 local function destroyOldGui()
     local parents = {}
     pcall(function() local h = gethui() if h then parents[#parents + 1] = h end end)
     pcall(function() parents[#parents + 1] = game:GetService("CoreGui") end)
-    pcall(function()
-        local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        if pg then parents[#parents + 1] = pg end
-    end)
+    pcall(function() local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui") if pg then parents[#parents + 1] = pg end end)
     for _, par in ipairs(parents) do
-        for _, ch in ipairs(par:GetChildren()) do
-            if ch.Name == GUI_NAME then
-                pcall(function() ch:Destroy() end)
-            end
-        end
+        for _, ch in ipairs(par:GetChildren()) do if ch.Name == GUI_NAME then pcall(function() ch:Destroy() end) end end
     end
 end
 destroyOldGui()
@@ -393,9 +325,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 pcall(function() ScreenGui.Parent = getGuiParent() end)
-if not ScreenGui.Parent then
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 taskLib.spawn(function()
     while alive() do
@@ -406,20 +336,22 @@ taskLib.spawn(function()
 end)
 
 local function serialize(v)
-    if typeof(v) == "Color3" then
-        return { __c3 = { v.R, v.G, v.B } }
-    end
+    if typeof(v) == "Color3" then return { __c3 = { v.R, v.G, v.B } } end
     return v
 end
 local function deserialize(v)
-    if type(v) == "table" and v.__c3 then
-        return Color3.new(v.__c3[1], v.__c3[2], v.__c3[3])
-    end
+    if type(v) == "table" and v.__c3 then return Color3.new(v.__c3[1], v.__c3[2], v.__c3[3]) end
     return v
 end
 
+local function keyName(k)
+    if typeof(k) == "EnumItem" then return k.Name end
+    if type(k) == "string" then return k end
+    return "None"
+end
+
 -- =========================================================
--- API DE CONSTRUCTION (tout est taggé)
+-- MAKE API
 -- =========================================================
 local function makeAPI(scroll)
     local layout = Instance.new("UIListLayout")
@@ -452,7 +384,7 @@ local function makeAPI(scroll)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, h)
         f.BackgroundColor3 = Theme.Element
-        tagTheme(f, "BackgroundColor3")
+        registerThemeObject(f, "Element", "BackgroundColor3")
         f.BorderSizePixel = 0
         f.LayoutOrder = nextOrder()
         f.Parent = scroll
@@ -461,38 +393,21 @@ local function makeAPI(scroll)
         return f
     end
 
-    local function makeTitle(card, text, yOff, widthOffset)
+    local function makeText(parent, size, pos, text, font, textSize, themeKey, align, anchor)
         local t = Instance.new("TextLabel")
         t.BackgroundTransparency = 1
-        t.Position = UDim2.new(0, 12, 0, yOff)
-        t.Size = UDim2.new(1, widthOffset, 0, 18)
-        t.Font = Enum.Font.GothamMedium
+        t.Size = size
+        t.Position = pos
+        if anchor then t.AnchorPoint = anchor end
+        t.Font = font or Enum.Font.Gotham
         t.Text = text
-        t.TextColor3 = Theme.Text
-        tagTheme(t, "TextColor3")
-        t.TextSize = 14
-        t.TextXAlignment = Enum.TextXAlignment.Left
+        t.TextColor3 = Theme[themeKey] or Theme.Text
+        registerThemeObject(t, themeKey or "Text", "TextColor3")
+        t.TextSize = textSize or 14
+        t.TextXAlignment = align or Enum.TextXAlignment.Left
         t.TextTruncate = Enum.TextTruncate.AtEnd
-        t.Parent = card
+        t.Parent = parent
         return t
-    end
-
-    local function makeDesc(card, text, yOff)
-        local d = Instance.new("TextLabel")
-        d.BackgroundTransparency = 1
-        d.Position = UDim2.new(0, 12, 0, yOff)
-        d.Size = UDim2.new(1, -24, 0, 28)
-        d.Font = Enum.Font.Gotham
-        d.Text = text
-        d.TextColor3 = Theme.SubText
-        tagTheme(d, "TextColor3")
-        d.TextSize = 12
-        d.TextWrapped = true
-        d.TextTruncate = Enum.TextTruncate.AtEnd
-        d.TextXAlignment = Enum.TextXAlignment.Left
-        d.TextYAlignment = Enum.TextYAlignment.Top
-        d.Parent = card
-        return d
     end
 
     local function hitOverlay(card, height)
@@ -513,12 +428,6 @@ local function makeAPI(scroll)
         return b
     end
 
-    local function keyName(k)
-        if typeof(k) == "EnumItem" then return k.Name end
-        if type(k) == "string" then return k end
-        return "None"
-    end
-
     local api = {}
 
     function api:Section(text)
@@ -526,7 +435,7 @@ local function makeAPI(scroll)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 28)
         f.BackgroundColor3 = Theme.Panel
-        tagTheme(f, "BackgroundColor3")
+        registerThemeObject(f, "Panel", "BackgroundColor3")
         f.BorderSizePixel = 0
         f.LayoutOrder = nextOrder()
         f.Parent = scroll
@@ -536,35 +445,15 @@ local function makeAPI(scroll)
         bar.Size = UDim2.new(0, 3, 0, 14)
         bar.Position = UDim2.new(0, 8, 0.5, -7)
         bar.BorderSizePixel = 0
+        bar.BackgroundColor3 = Theme.Accent
+        registerThemeObject(bar, "Accent", "BackgroundColor3")
         bar.Parent = f
         corner(bar, 2)
-        regAccent(bar, "BackgroundColor3")
 
-        local l = Instance.new("TextLabel")
-        l.BackgroundTransparency = 1
-        l.Position = UDim2.new(0, 20, 0, 0)
-        l.Size = UDim2.new(1, -52, 1, 0)
-        l.Font = Enum.Font.GothamBold
-        l.Text = string.upper(text)
-        l.TextColor3 = Theme.Text
-        tagTheme(l, "TextColor3")
-        l.TextSize = 12
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.TextTruncate = Enum.TextTruncate.AtEnd
-        l.Parent = f
+        makeText(f, UDim2.new(1, -52, 1, 0), UDim2.new(0, 20, 0, 0), string.upper(text), Enum.Font.GothamBold, 12, "Text")
 
-        local chev = Instance.new("TextLabel")
-        chev.BackgroundTransparency = 1
-        chev.AnchorPoint = Vector2.new(1, 0.5)
-        chev.Position = UDim2.new(1, -12, 0.5, 0)
-        chev.Size = UDim2.new(0, 16, 0, 16)
-        chev.Font = Enum.Font.GothamBold
-        chev.Text = ">"
+        local chev = makeText(f, UDim2.new(0, 16, 0, 16), UDim2.new(1, -12, 0.5, -8), ">", Enum.Font.GothamBold, 13, "SubText", nil, Vector2.new(1, 0.5))
         chev.Rotation = 90
-        chev.TextColor3 = Theme.SubText
-        tagTheme(chev, "TextColor3")
-        chev.TextSize = 13
-        chev.Parent = f
 
         local btn = Instance.new("TextButton")
         btn.BackgroundTransparency = 1
@@ -595,27 +484,17 @@ local function makeAPI(scroll)
 
     function api:Label(text)
         local card = newCard(34)
-        card.BackgroundColor3 = Theme.Panel   -- on force le Label en Panel
-        local l = Instance.new("TextLabel")
-        l.BackgroundTransparency = 1
-        l.Position = UDim2.new(0, 12, 0, 0)
-        l.Size = UDim2.new(1, -24, 1, 0)
-        l.Font = Enum.Font.Gotham
-        l.Text = text
-        l.TextColor3 = Theme.SubText
-        tagTheme(l, "TextColor3")
-        l.TextSize = 13
-        l.TextWrapped = true
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.Parent = card
-        return { Set = function(t) l.Text = t end }
+        card.BackgroundColor3 = Theme.Panel
+        registerThemeObject(card, "Panel", "BackgroundColor3")
+        makeText(card, UDim2.new(1, -24, 1, 0), UDim2.new(0, 12, 0, 0), text, Enum.Font.Gotham, 13, "SubText")
+        return { Set = function(t) card:FindFirstChildOfClass("TextLabel").Text = t end }
     end
 
     function api:Line()
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 1)
         f.BackgroundColor3 = Theme.Stroke
-        tagTheme(f, "BackgroundColor3")
+        registerThemeObject(f, "Stroke", "BackgroundColor3")
         f.BorderSizePixel = 0
         f.LayoutOrder = nextOrder()
         f.Parent = scroll
@@ -626,21 +505,13 @@ local function makeAPI(scroll)
         callback = callback or function() end
         local hasDesc = desc and desc ~= ""
         local card = newCard(hasDesc and 62 or 38)
-        local title = makeTitle(card, text, hasDesc and 8 or 0, -52)
-        if not hasDesc then title.Size = UDim2.new(1, -52, 1, 0) end
-        if hasDesc then makeDesc(card, desc, 27) end
-
-        local arrow = Instance.new("TextLabel")
-        arrow.BackgroundTransparency = 1
-        arrow.AnchorPoint = Vector2.new(1, 0.5)
-        arrow.Position = hasDesc and UDim2.new(1, -14, 0, 18) or UDim2.new(1, -14, 0.5, 0)
-        arrow.Size = UDim2.new(0, 20, 0, 20)
-        arrow.Font = Enum.Font.GothamBold
-        arrow.Text = ">"
-        arrow.TextColor3 = Theme.SubText
-        tagTheme(arrow, "TextColor3")
-        arrow.TextSize = 14
-        arrow.Parent = card
+        makeText(card, UDim2.new(1, -52, 0, 18), UDim2.new(0, 12, hasDesc and 8 or 0, 0), text, Enum.Font.GothamMedium, 14, "Text")
+        if hasDesc then
+            local d = makeText(card, UDim2.new(1, -24, 0, 28), UDim2.new(0, 12, 0, 27), desc, Enum.Font.Gotham, 12, "SubText")
+            d.TextWrapped = true
+            d.TextYAlignment = Enum.TextYAlignment.Top
+        end
+        local arrow = makeText(card, UDim2.new(0, 20, 0, 20), UDim2.new(1, -14, hasDesc and 0 or 0.5, hasDesc and 18 or -10), ">", Enum.Font.GothamBold, 14, "SubText", nil, Vector2.new(1, 0.5))
 
         hitOverlay(card).MouseButton1Click:Connect(function()
             tween(card, 0.08, { BackgroundColor3 = Theme.Accent })
@@ -660,9 +531,12 @@ local function makeAPI(scroll)
         local kbKey = opts.Keybind and keyName(opts.Keybind) or nil
         local card = newCard(hasDesc and 62 or 38)
         local titleReserve = kbKey and -120 or -64
-        local title = makeTitle(card, text, hasDesc and 8 or 0, titleReserve)
-        if not hasDesc then title.Size = UDim2.new(1, titleReserve, 1, 0) end
-        if hasDesc then makeDesc(card, desc, 27) end
+        makeText(card, UDim2.new(1, titleReserve, hasDesc and 18 or 38, 0), UDim2.new(0, 12, hasDesc and 8 or 0, hasDesc and 0 or 0), text, Enum.Font.GothamMedium, 14, "Text")
+        if hasDesc then
+            local d = makeText(card, UDim2.new(1, titleReserve, 0, 28), UDim2.new(0, 12, 0, 27), desc, Enum.Font.Gotham, 12, "SubText")
+            d.TextWrapped = true
+            d.TextYAlignment = Enum.TextYAlignment.Top
+        end
 
         local cY = hasDesc and { 0, 18 } or { 0.5, 0 }
 
@@ -671,7 +545,7 @@ local function makeAPI(scroll)
         pill.Position = UDim2.new(1, -14, cY[1], cY[2])
         pill.Size = UDim2.new(0, 40, 0, 20)
         pill.BackgroundColor3 = Theme.Stroke
-        tagTheme(pill, "BackgroundColor3")
+        registerThemeObject(pill, "Stroke", "BackgroundColor3")
         pill.BorderSizePixel = 0
         pill.Parent = card
         corner(pill, 10)
@@ -681,7 +555,7 @@ local function makeAPI(scroll)
         knob.AnchorPoint = Vector2.new(0, 0.5)
         knob.Size = UDim2.new(0, 16, 0, 16)
         knob.BackgroundColor3 = Theme.Text
-        tagTheme(knob, "BackgroundColor3")
+        registerThemeObject(knob, "Text", "BackgroundColor3")
         knob.BorderSizePixel = 0
         knob.Parent = pill
         corner(knob, 8)
@@ -694,9 +568,6 @@ local function makeAPI(scroll)
             if flag then _Catalyst.Flags[flag] = state end
             if fire then pcall(callback, state) end
         end
-        onAccent(function(c)
-            if state then pill.BackgroundColor3 = c end
-        end)
 
         hitOverlay(card).MouseButton1Click:Connect(function()
             apply(not state, true)
@@ -708,23 +579,13 @@ local function makeAPI(scroll)
             chip.Position = UDim2.new(1, -62, cY[1], cY[2])
             chip.Size = UDim2.new(0, 48, 0, 22)
             chip.BackgroundColor3 = Theme.Panel
-            tagTheme(chip, "BackgroundColor3")
+            registerThemeObject(chip, "Panel", "BackgroundColor3")
             chip.BorderSizePixel = 0
             chip.Parent = card
             corner(chip, 4)
             stroke(chip, Theme.Stroke, 1, 0)
 
-            local chipLbl = Instance.new("TextLabel")
-            chipLbl.BackgroundTransparency = 1
-            chipLbl.Size = UDim2.new(1, -6, 1, 0)
-            chipLbl.Position = UDim2.new(0, 3, 0, 0)
-            chipLbl.Font = Enum.Font.GothamMedium
-            chipLbl.Text = kbKey
-            chipLbl.TextColor3 = Theme.SubText
-            tagTheme(chipLbl, "TextColor3")
-            chipLbl.TextSize = 11
-            chipLbl.TextTruncate = Enum.TextTruncate.AtEnd
-            chipLbl.Parent = chip
+            local chipLbl = makeText(chip, UDim2.new(1, -6, 1, 0), UDim2.new(0, 3, 0, 0), kbKey, Enum.Font.GothamMedium, 11, "SubText")
 
             local chipBtn = Instance.new("TextButton")
             chipBtn.BackgroundTransparency = 1
@@ -738,7 +599,6 @@ local function makeAPI(scroll)
             local function setKbKey(k)
                 kbKey = keyName(k)
                 chipLbl.Text = kbKey
-                chipLbl.TextColor3 = Theme.SubText
                 if flag then _Catalyst.Flags[flag .. "Key"] = kbKey end
             end
 
@@ -746,7 +606,6 @@ local function makeAPI(scroll)
                 if kbListening then return end
                 kbListening = true
                 chipLbl.Text = "..."
-                chipLbl.TextColor3 = Theme.Accent
                 local conn
                 conn = UserInputService.InputBegan:Connect(function(i)
                     if i.UserInputType == Enum.UserInputType.Keyboard then
@@ -807,47 +666,38 @@ local function makeAPI(scroll)
             return prefix .. v .. suffix
         end
 
-        local title = makeTitle(card, text, 8, -104)
-
-        local valLbl = Instance.new("TextLabel")
-        valLbl.BackgroundTransparency = 1
-        valLbl.AnchorPoint = Vector2.new(1, 0)
-        valLbl.Position = UDim2.new(1, -14, 0, 8)
-        valLbl.Size = UDim2.new(0, 88, 0, 18)
-        valLbl.Font = Enum.Font.GothamBold
-        valLbl.Text = fmt(default)
-        valLbl.TextColor3 = Theme.Text
-        tagTheme(valLbl, "TextColor3")
-        valLbl.TextSize = 13
-        valLbl.TextXAlignment = Enum.TextXAlignment.Right
-        valLbl.TextTruncate = Enum.TextTruncate.AtEnd
-        valLbl.Parent = card
-
-        if hasDesc then makeDesc(card, desc, 27) end
+        makeText(card, UDim2.new(1, -104, 0, 18), UDim2.new(0, 12, 0, 8), text, Enum.Font.GothamMedium, 14, "Text")
+        local valLbl = makeText(card, UDim2.new(0, 88, 0, 18), UDim2.new(1, -14, 0, 8), fmt(default), Enum.Font.GothamBold, 13, "Text", Enum.TextXAlignment.Right, Vector2.new(1, 0))
+        if hasDesc then
+            local d = makeText(card, UDim2.new(1, -24, 0, 28), UDim2.new(0, 12, 0, 27), desc, Enum.Font.Gotham, 12, "SubText")
+            d.TextWrapped = true
+            d.TextYAlignment = Enum.TextYAlignment.Top
+        end
 
         local track = Instance.new("Frame")
         track.AnchorPoint = Vector2.new(0, 1)
         track.Position = UDim2.new(0, 12, 1, -13)
         track.Size = UDim2.new(1, -24, 0, 5)
         track.BackgroundColor3 = Theme.Stroke
-        tagTheme(track, "BackgroundColor3")
+        registerThemeObject(track, "Stroke", "BackgroundColor3")
         track.BorderSizePixel = 0
         track.Parent = card
         corner(track, 3)
 
         local fill = Instance.new("Frame")
         fill.Size = UDim2.new(0, 0, 1, 0)
+        fill.BackgroundColor3 = Theme.Accent
+        registerThemeObject(fill, "Accent", "BackgroundColor3")
         fill.BorderSizePixel = 0
         fill.Parent = track
         corner(fill, 3)
-        regAccent(fill, "BackgroundColor3")
 
         local knob = Instance.new("Frame")
         knob.AnchorPoint = Vector2.new(0.5, 0.5)
         knob.Position = UDim2.new(0, 0, 0.5, 0)
         knob.Size = UDim2.new(0, 13, 0, 13)
         knob.BackgroundColor3 = Theme.Text
-        tagTheme(knob, "BackgroundColor3")
+        registerThemeObject(knob, "Text", "BackgroundColor3")
         knob.BorderSizePixel = 0
         knob.ZIndex = 3
         knob.Parent = track
@@ -868,27 +718,22 @@ local function makeAPI(scroll)
             setAlpha((v - min) / (max - min), fire)
         end
 
-        -- Drag du slider
-        local dragStartInput
+        -- Slider drag
+        local sDragInput, sStartMouse
         track.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragStartInput = input.Position
-                local conn
-                conn = RunService.RenderStepped:Connect(function()
-                    if dragStartInput then
-                        local pos = UserInputService:GetMouseLocation()
-                        local a = (pos.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
-                        setAlpha(a, true)
-                    else
-                        conn:Disconnect()
-                    end
-                end)
+                sDragInput = input
+                sStartMouse = input.Position
             end
         end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragStartInput = nil
+        track.InputChanged:Connect(function(input)
+            if input == sDragInput then
+                local a = (input.Position.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
+                setAlpha(a, true)
             end
+        end)
+        track.InputEnded:Connect(function(input)
+            if input == sDragInput then sDragInput = nil end
         end)
 
         setValue(default, false)
@@ -908,44 +753,9 @@ local function makeAPI(scroll)
         local card = newCard(38)
         card.ClipsDescendants = true
 
-        local title = Instance.new("TextLabel")
-        title.BackgroundTransparency = 1
-        title.Position = UDim2.new(0, 12, 0, 0)
-        title.Size = UDim2.new(1, -122, 0, 38)
-        title.Font = Enum.Font.GothamMedium
-        title.Text = text
-        title.TextColor3 = Theme.Text
-        tagTheme(title, "TextColor3")
-        title.TextSize = 14
-        title.TextXAlignment = Enum.TextXAlignment.Left
-        title.TextTruncate = Enum.TextTruncate.AtEnd
-        title.Parent = card
-
-        local sel = Instance.new("TextLabel")
-        sel.BackgroundTransparency = 1
-        sel.AnchorPoint = Vector2.new(1, 0)
-        sel.Position = UDim2.new(1, -34, 0, 0)
-        sel.Size = UDim2.new(0, 86, 0, 38)
-        sel.Font = Enum.Font.Gotham
-        sel.Text = default or "Select..."
-        sel.TextColor3 = Theme.SubText
-        tagTheme(sel, "TextColor3")
-        sel.TextSize = 13
-        sel.TextXAlignment = Enum.TextXAlignment.Right
-        sel.TextTruncate = Enum.TextTruncate.AtEnd
-        sel.Parent = card
-
-        local arrow = Instance.new("TextLabel")
-        arrow.BackgroundTransparency = 1
-        arrow.AnchorPoint = Vector2.new(1, 0)
-        arrow.Position = UDim2.new(1, -14, 0, 0)
-        arrow.Size = UDim2.new(0, 16, 0, 38)
-        arrow.Font = Enum.Font.GothamBold
-        arrow.Text = "v"
-        arrow.TextColor3 = Theme.SubText
-        tagTheme(arrow, "TextColor3")
-        arrow.TextSize = 12
-        arrow.Parent = card
+        makeText(card, UDim2.new(1, -122, 0, 38), UDim2.new(0, 12, 0, 0), text, Enum.Font.GothamMedium, 14, "Text")
+        local sel = makeText(card, UDim2.new(0, 86, 0, 38), UDim2.new(1, -34, 0, 0), default or "Select...", Enum.Font.Gotham, 13, "SubText", Enum.TextXAlignment.Right, Vector2.new(1, 0))
+        local arrow = makeText(card, UDim2.new(0, 16, 0, 38), UDim2.new(1, -14, 0, 0), "v", Enum.Font.GothamBold, 12, "SubText", nil, Vector2.new(1, 0))
 
         local holder = Instance.new("ScrollingFrame")
         holder.Position = UDim2.new(0, 8, 0, 40)
@@ -956,7 +766,8 @@ local function makeAPI(scroll)
         holder.AutomaticCanvasSize = Enum.AutomaticSize.Y
         holder.CanvasSize = UDim2.new(0, 0, 0, 0)
         holder.Parent = card
-        regAccent(holder, "ScrollBarImageColor3")
+        holder.ScrollBarImageColor3 = Theme.Accent
+        registerThemeObject(holder, "Accent", "ScrollBarImageColor3")
         local hLayout = Instance.new("UIListLayout")
         hLayout.SortOrder = Enum.SortOrder.LayoutOrder
         hLayout.Padding = UDim.new(0, 3)
@@ -982,7 +793,6 @@ local function makeAPI(scroll)
         local function choose(v, fire)
             selected = v
             sel.Text = tostring(v)
-            sel.TextColor3 = Theme.Text
             if flag then _Catalyst.Flags[flag] = v end
             if fire then pcall(callback, v) end
             if open then toggle() end
@@ -991,12 +801,12 @@ local function makeAPI(scroll)
             local it = Instance.new("TextButton")
             it.Size = UDim2.new(1, 0, 0, 25)
             it.BackgroundColor3 = Theme.Panel
-            tagTheme(it, "BackgroundColor3")
+            registerThemeObject(it, "Panel", "BackgroundColor3")
             it.AutoButtonColor = false
             it.Font = Enum.Font.Gotham
             it.Text = tostring(v)
             it.TextColor3 = Theme.SubText
-            tagTheme(it, "TextColor3")
+            registerThemeObject(it, "SubText", "TextColor3")
             it.TextSize = 13
             it.TextTruncate = Enum.TextTruncate.AtEnd
             it.Parent = holder
@@ -1040,8 +850,8 @@ local function makeAPI(scroll)
         callback = callback or function() end
         local card = newCard(38)
         card.ClipsDescendants = true
-        local title = makeTitle(card, text, 0, -64)
-        title.Size = UDim2.new(1, -64, 0, 38)
+
+        makeText(card, UDim2.new(1, -64, 0, 38), UDim2.new(0, 12, 0, 0), text, Enum.Font.GothamMedium, 14, "Text")
 
         local swatch = Instance.new("Frame")
         swatch.AnchorPoint = Vector2.new(1, 0.5)
@@ -1064,6 +874,7 @@ local function makeAPI(scroll)
         box.Image = "rbxassetid://4155801252"
         box.Parent = card
         corner(box, 4)
+
         local boxDot = Instance.new("Frame")
         boxDot.AnchorPoint = Vector2.new(0.5, 0.5)
         boxDot.Size = UDim2.new(0, 10, 0, 10)
@@ -1090,6 +901,7 @@ local function makeAPI(scroll)
             ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0)),
         }
         hg.Parent = hue
+
         local hueDot = Instance.new("Frame")
         hueDot.AnchorPoint = Vector2.new(0.5, 0.5)
         hueDot.Size = UDim2.new(0, 6, 1, 4)
@@ -1106,26 +918,28 @@ local function makeAPI(scroll)
         rbRow.Text = "Rainbow"
         rbRow.Font = Enum.Font.Gotham
         rbRow.TextColor3 = Theme.SubText
-        tagTheme(rbRow, "TextColor3")
+        registerThemeObject(rbRow, "SubText", "TextColor3")
         rbRow.TextSize = 13
         rbRow.TextXAlignment = Enum.TextXAlignment.Left
         rbRow.AutoButtonColor = false
         rbRow.Parent = card
+
         local rbPill = Instance.new("Frame")
         rbPill.AnchorPoint = Vector2.new(1, 0.5)
         rbPill.Position = UDim2.new(1, 0, 0.5, 0)
         rbPill.Size = UDim2.new(0, 34, 0, 16)
         rbPill.BackgroundColor3 = Theme.Stroke
-        tagTheme(rbPill, "BackgroundColor3")
+        registerThemeObject(rbPill, "Stroke", "BackgroundColor3")
         rbPill.BorderSizePixel = 0
         rbPill.Parent = rbRow
         corner(rbPill, 8)
+
         local rbKnob = Instance.new("Frame")
         rbKnob.Position = UDim2.new(0, 2, 0.5, 0)
         rbKnob.AnchorPoint = Vector2.new(0, 0.5)
         rbKnob.Size = UDim2.new(0, 12, 0, 12)
         rbKnob.BackgroundColor3 = Theme.Text
-        tagTheme(rbKnob, "BackgroundColor3")
+        registerThemeObject(rbKnob, "Text", "BackgroundColor3")
         rbKnob.BorderSizePixel = 0
         rbKnob.Parent = rbPill
         corner(rbKnob, 6)
@@ -1144,58 +958,38 @@ local function makeAPI(scroll)
             if fire then pcall(callback, col) end
         end
 
-        onAccent(function(c)
-            if rainbow then rbPill.BackgroundColor3 = c end
-        end)
-
-        makeDrag(box, function() end)  -- sera redéfini
-        local dragStartInput
+        -- Box drag
+        local bDragInput
         box.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragStartInput = input.Position
-                local conn
-                conn = RunService.RenderStepped:Connect(function()
-                    if dragStartInput and not rainbow then
-                        local pos = UserInputService:GetMouseLocation()
-                        local x = math.clamp((pos.X - box.AbsolutePosition.X) / math.max(box.AbsoluteSize.X, 1), 0, 1)
-                        local y = math.clamp((pos.Y - box.AbsolutePosition.Y) / math.max(box.AbsoluteSize.Y, 1), 0, 1)
-                        s, v = x, 1 - y
-                        apply(true)
-                    else
-                        conn:Disconnect()
-                    end
-                end)
+                bDragInput = input
             end
         end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragStartInput = nil
+        box.InputChanged:Connect(function(input)
+            if input == bDragInput and not rainbow then
+                local x = math.clamp((input.Position.X - box.AbsolutePosition.X) / math.max(box.AbsoluteSize.X, 1), 0, 1)
+                local y = math.clamp((input.Position.Y - box.AbsolutePosition.Y) / math.max(box.AbsoluteSize.Y, 1), 0, 1)
+                s, v = x, 1 - y
+                apply(true)
             end
         end)
+        box.InputEnded:Connect(function(input) if input == bDragInput then bDragInput = nil end end)
 
         -- Hue drag
-        local hueDragStart
+        local hDragInput
         hue.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                hueDragStart = input.Position
-                local conn
-                conn = RunService.RenderStepped:Connect(function()
-                    if hueDragStart and not rainbow then
-                        local pos = UserInputService:GetMouseLocation()
-                        local x = math.clamp((pos.X - hue.AbsolutePosition.X) / math.max(hue.AbsoluteSize.X, 1), 0, 1)
-                        h = x
-                        apply(true)
-                    else
-                        conn:Disconnect()
-                    end
-                end)
+                hDragInput = input
             end
         end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                hueDragStart = nil
+        hue.InputChanged:Connect(function(input)
+            if input == hDragInput and not rainbow then
+                local x = math.clamp((input.Position.X - hue.AbsolutePosition.X) / math.max(hue.AbsoluteSize.X, 1), 0, 1)
+                h = x
+                apply(true)
             end
         end)
+        hue.InputEnded:Connect(function(input) if input == hDragInput then hDragInput = nil end end)
 
         rbRow.MouseButton1Click:Connect(function()
             rainbow = not rainbow
@@ -1238,52 +1032,30 @@ local function makeAPI(scroll)
         opts = opts or {}
         local mode = opts.Mode or "Press"
         local card = newCard(38)
-        local title = makeTitle(card, text, 0, -104)
-        title.Size = UDim2.new(1, -104, 1, 0)
+        makeText(card, UDim2.new(1, -104, 1, 0), UDim2.new(0, 12, 0, 0), text, Enum.Font.GothamMedium, 14, "Text")
 
-        local key = keyName(defaultKey)
+        local key = keyName(defaultKey or Enum.KeyCode.Unknown)
         local bstate = false
 
-        local modeLbl = Instance.new("TextLabel")
-        modeLbl.BackgroundTransparency = 1
-        modeLbl.AnchorPoint = Vector2.new(1, 0.5)
-        modeLbl.Position = UDim2.new(1, -104, 0.5, 0)
-        modeLbl.Size = UDim2.new(0, 50, 0, 16)
-        modeLbl.Font = Enum.Font.Gotham
-        modeLbl.Text = string.lower(mode)
-        modeLbl.TextColor3 = Theme.SubText
-        tagTheme(modeLbl, "TextColor3")
-        modeLbl.TextSize = 11
-        modeLbl.TextXAlignment = Enum.TextXAlignment.Right
-        modeLbl.Parent = card
+        local modeLbl = makeText(card, UDim2.new(0, 50, 0, 16), UDim2.new(1, -104, 0.5, -8), string.lower(mode or "press"), Enum.Font.Gotham, 11, "SubText", Enum.TextXAlignment.Right, Vector2.new(1, 0.5))
 
         local box = Instance.new("Frame")
         box.AnchorPoint = Vector2.new(1, 0.5)
         box.Position = UDim2.new(1, -14, 0.5, 0)
         box.Size = UDim2.new(0, 84, 0, 24)
         box.BackgroundColor3 = Theme.Panel
-        tagTheme(box, "BackgroundColor3")
+        registerThemeObject(box, "Panel", "BackgroundColor3")
         box.BorderSizePixel = 0
         box.Parent = card
         corner(box, 4)
         stroke(box, Theme.Stroke, 1, 0)
-        local keyLbl = Instance.new("TextLabel")
-        keyLbl.BackgroundTransparency = 1
-        keyLbl.Size = UDim2.new(1, -8, 1, 0)
-        keyLbl.Position = UDim2.new(0, 4, 0, 0)
-        keyLbl.Font = Enum.Font.GothamMedium
-        keyLbl.Text = key
-        keyLbl.TextColor3 = Theme.SubText
-        tagTheme(keyLbl, "TextColor3")
-        keyLbl.TextSize = 12
-        keyLbl.TextTruncate = Enum.TextTruncate.AtEnd
-        keyLbl.Parent = box
+
+        local keyLbl = makeText(box, UDim2.new(1, -8, 1, 0), UDim2.new(0, 4, 0, 0), key, Enum.Font.GothamMedium, 12, "SubText")
 
         local listening = false
         local function setKey(k)
             key = keyName(k)
             keyLbl.Text = key
-            keyLbl.TextColor3 = Theme.SubText
             if flag then _Catalyst.Flags[flag] = key end
         end
 
@@ -1291,7 +1063,6 @@ local function makeAPI(scroll)
             if listening then return end
             listening = true
             keyLbl.Text = "..."
-            keyLbl.TextColor3 = Theme.Accent
             local conn
             conn = UserInputService.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.Keyboard then
@@ -1339,10 +1110,11 @@ local function makeAPI(scroll)
         callback = callback or function() end
         local hasDesc = desc and desc ~= ""
         local card = newCard(hasDesc and 88 or 66)
-        makeTitle(card, text, 8, -24)
+        makeText(card, UDim2.new(1, -24, 0, 18), UDim2.new(0, 12, 0, 8), text, Enum.Font.GothamMedium, 14, "Text")
         if hasDesc then
-            local d = makeDesc(card, desc, 26)
-            d.Size = UDim2.new(1, -24, 0, 24)
+            local d = makeText(card, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, 26), desc, Enum.Font.Gotham, 12, "SubText")
+            d.TextWrapped = true
+            d.TextYAlignment = Enum.TextYAlignment.Top
         end
 
         local frame = Instance.new("Frame")
@@ -1350,7 +1122,7 @@ local function makeAPI(scroll)
         frame.Position = UDim2.new(0, 12, 1, -10)
         frame.Size = UDim2.new(1, -24, 0, 28)
         frame.BackgroundColor3 = Theme.Panel
-        tagTheme(frame, "BackgroundColor3")
+        registerThemeObject(frame, "Panel", "BackgroundColor3")
         frame.BorderSizePixel = 0
         frame.Parent = card
         corner(frame, 4)
@@ -1364,7 +1136,7 @@ local function makeAPI(scroll)
         tb.PlaceholderText = "..."
         tb.Text = ""
         tb.TextColor3 = Theme.Text
-        tagTheme(tb, "TextColor3")
+        registerThemeObject(tb, "Text", "TextColor3")
         tb.PlaceholderColor3 = Theme.SubText
         tb.TextSize = 13
         tb.ClearTextOnFocus = false
@@ -1396,7 +1168,7 @@ local function makeAPI(scroll)
 end
 
 -- =========================================================
--- FENÊTRE PRINCIPALE
+-- WINDOW
 -- =========================================================
 function _Catalyst:Window(opt)
     if type(opt) == "string" then opt = { Title = opt } end
@@ -1408,7 +1180,6 @@ function _Catalyst:Window(opt)
     local ToggleKey    = opt.ToggleKey or opt.CloseBind or Enum.KeyCode.RightAlt
 
     applyTheme(opt.Theme)
-    if opt.Accent then setAccent(opt.Accent) end
     FileSystem.makeFolder(ConfigFolder)
 
     local HideSettings = opt.HideSettings == true
@@ -1421,7 +1192,7 @@ function _Catalyst:Window(opt)
 
     local Window = {}
 
-    -- Splash screen (optionnel)
+    -- Splash
     local splashOpt = opt.Splash
     if splashOpt ~= false then
         splashOpt = splashOpt or {}
@@ -1430,7 +1201,6 @@ function _Catalyst:Window(opt)
         local splashBgColor = splashOpt.BackgroundColor or Color3.fromRGB(0, 0, 0)
         local splashTitleColor = splashOpt.TitleColor or Theme.Accent
         local splashSubColor = splashOpt.SubColor or Theme.Text
-        local splashLineColor = splashOpt.AccentLineColor or Theme.Accent
 
         local splashScreen = Instance.new("Frame")
         splashScreen.Size = UDim2.new(1, 0, 1, 0)
@@ -1483,7 +1253,7 @@ function _Catalyst:Window(opt)
         splashAccentLine.Size = UDim2.new(0, 0, 0, 2)
         splashAccentLine.Position = UDim2.new(0.5, 0, 0.55, 0)
         splashAccentLine.AnchorPoint = Vector2.new(0.5, 0)
-        splashAccentLine.BackgroundColor3 = splashLineColor
+        splashAccentLine.BackgroundColor3 = Theme.Accent
         splashAccentLine.BorderSizePixel = 0
         splashAccentLine.ZIndex = 102
         splashAccentLine.Parent = splashScreen
@@ -1515,21 +1285,20 @@ function _Catalyst:Window(opt)
             tween(splashTitle, 0.5, { TextTransparency = 1 })
             tween(splashSub, 0.5, { TextTransparency = 1 })
             tween(splashAccentLine, 0.5, { BackgroundTransparency = 1 })
+
             taskLib.wait(1.0)
             splashScreen:Destroy()
         end)
     end
 
-    -- =========================================================
-    -- MAIN UI
-    -- =========================================================
+    -- MainFrame
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.Size = UDim2.fromOffset(WIN_W, WIN_H)
     MainFrame.BackgroundColor3 = Theme.Window
-    tagTheme(MainFrame, "BackgroundColor3")
+    registerThemeObject(MainFrame, "Window", "BackgroundColor3")
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     corner(MainFrame, 10)
@@ -1570,7 +1339,8 @@ function _Catalyst:Window(opt)
     if workspace.CurrentCamera then
         workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
             if not alive() then return end
-            computeFit() applyScale()
+            computeFit()
+            applyScale()
         end)
     end
 
@@ -1596,7 +1366,7 @@ function _Catalyst:Window(opt)
     local function makePanel(titleText)
         local f = Instance.new("Frame")
         f.BackgroundColor3 = Theme.Panel
-        tagTheme(f, "BackgroundColor3")
+        registerThemeObject(f, "Panel", "BackgroundColor3")
         f.BorderSizePixel = 0
         f.ClipsDescendants = true
         f.Parent = MainFrame
@@ -1606,15 +1376,16 @@ function _Catalyst:Window(opt)
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 32)
         header.BackgroundColor3 = Theme.Header
-        tagTheme(header, "BackgroundColor3")
+        registerThemeObject(header, "Header", "BackgroundColor3")
         header.BorderSizePixel = 0
         header.Parent = f
 
         local accentLine = Instance.new("Frame")
         accentLine.Size = UDim2.new(1, 0, 0, 2)
         accentLine.BorderSizePixel = 0
+        accentLine.BackgroundColor3 = Theme.Accent
+        registerThemeObject(accentLine, "Accent", "BackgroundColor3")
         accentLine.Parent = header
-        regAccent(accentLine, "BackgroundColor3")
 
         local grip = Instance.new("TextLabel")
         grip.BackgroundTransparency = 1
@@ -1623,7 +1394,7 @@ function _Catalyst:Window(opt)
         grip.Font = Enum.Font.GothamBold
         grip.Text = "::"
         grip.TextColor3 = Theme.SubText
-        tagTheme(grip, "TextColor3")
+        registerThemeObject(grip, "SubText", "TextColor3")
         grip.TextSize = 14
         grip.Parent = header
 
@@ -1634,7 +1405,7 @@ function _Catalyst:Window(opt)
         tl.Font = Enum.Font.GothamBold
         tl.Text = titleText
         tl.TextColor3 = Theme.Text
-        tagTheme(tl, "TextColor3")
+        registerThemeObject(tl, "Text", "TextColor3")
         tl.TextSize = 14
         tl.TextXAlignment = Enum.TextXAlignment.Left
         tl.TextTruncate = Enum.TextTruncate.AtEnd
@@ -1662,7 +1433,7 @@ function _Catalyst:Window(opt)
         sub.Font = Enum.Font.Gotham
         sub.Text = SubTitle
         sub.TextColor3 = Theme.SubText
-        tagTheme(sub, "TextColor3")
+        registerThemeObject(sub, "SubText", "TextColor3")
         sub.TextSize = 11
         sub.TextXAlignment = Enum.TextXAlignment.Left
         sub.TextTruncate = Enum.TextTruncate.AtEnd
@@ -1681,7 +1452,8 @@ function _Catalyst:Window(opt)
     tabScroll.ScrollBarThickness = 3
     tabScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     tabScroll.Parent = tabsPanel.body
-    regAccent(tabScroll, "ScrollBarImageColor3")
+    tabScroll.ScrollBarImageColor3 = Theme.Accent
+    registerThemeObject(tabScroll, "Accent", "ScrollBarImageColor3")
     local tabLayout = Instance.new("UIListLayout")
     tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
     tabLayout.Padding = UDim.new(0, 5)
@@ -1691,26 +1463,14 @@ function _Catalyst:Window(opt)
     local tabs = {}
 
     local function refreshTabList()
-        local horiz = false  -- tabs on left, vertical
-        tabLayout.FillDirection = horiz and Enum.FillDirection.Horizontal or Enum.FillDirection.Vertical
+        tabLayout.FillDirection = Enum.FillDirection.Vertical
         for _, t in ipairs(tabs) do
-            if horiz then
-                t.btn.Size = UDim2.new(0, 130, 1, -12)
-                t.indicator.Size = UDim2.new(1, -8, 0, 3)
-                t.indicator.Position = UDim2.new(0, 4, 1, -3)
-            else
-                t.btn.Size = UDim2.new(1, 0, 0, 36)
-                t.indicator.Size = UDim2.new(0, 3, 1, -12)
-                t.indicator.Position = UDim2.new(0, 0, 0, 6)
-            end
+            t.btn.Size = UDim2.new(1, 0, 0, 36)
+            t.indicator.Size = UDim2.new(0, 3, 1, -12)
+            t.indicator.Position = UDim2.new(0, 0, 0, 6)
         end
-        if horiz then
-            tabScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
-            tabScroll.ScrollingDirection = Enum.ScrollingDirection.X
-        else
-            tabScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-            tabScroll.ScrollingDirection = Enum.ScrollingDirection.Y
-        end
+        tabScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        tabScroll.ScrollingDirection = Enum.ScrollingDirection.Y
     end
 
     local function placeFrame(f, x, y, w, h, animated)
@@ -1751,14 +1511,15 @@ function _Catalyst:Window(opt)
         container.CanvasSize = UDim2.new(0, 0, 0, 0)
         container.Visible = false
         container.Parent = contentPanel.body
-        regAccent(container, "ScrollBarImageColor3")
+        container.ScrollBarImageColor3 = Theme.Accent
+        registerThemeObject(container, "Accent", "ScrollBarImageColor3")
 
         local capi = makeAPI(container)
 
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, 0, 0, 36)
         btn.BackgroundColor3 = Theme.Element
-        tagTheme(btn, "BackgroundColor3")
+        registerThemeObject(btn, "Element", "BackgroundColor3")
         btn.BackgroundTransparency = 1
         btn.AutoButtonColor = false
         btn.Text = ""
@@ -1769,10 +1530,11 @@ function _Catalyst:Window(opt)
         indicator.Size = UDim2.new(0, 3, 1, -12)
         indicator.Position = UDim2.new(0, 0, 0, 6)
         indicator.BorderSizePixel = 0
+        indicator.BackgroundColor3 = Theme.Accent
+        registerThemeObject(indicator, "Accent", "BackgroundColor3")
         indicator.BackgroundTransparency = 1
         indicator.Parent = btn
         corner(indicator, 2)
-        regAccent(indicator, "BackgroundColor3")
 
         local ic
         if icon then
@@ -1782,7 +1544,7 @@ function _Catalyst:Window(opt)
             ic.Size = UDim2.new(0, 18, 0, 18)
             ic.Image = icon
             ic.ImageColor3 = Theme.SubText
-            tagTheme(ic, "ImageColor3")
+            registerThemeObject(ic, "SubText", "ImageColor3")
             ic.Parent = btn
         end
 
@@ -1793,7 +1555,7 @@ function _Catalyst:Window(opt)
         lbl.Font = Enum.Font.GothamMedium
         lbl.Text = name
         lbl.TextColor3 = Theme.SubText
-        tagTheme(lbl, "TextColor3")
+        registerThemeObject(lbl, "SubText", "TextColor3")
         lbl.TextSize = 14
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.TextTruncate = Enum.TextTruncate.AtEnd
@@ -1816,9 +1578,6 @@ function _Catalyst:Window(opt)
             if ic then tween(ic, 0.18, { ImageColor3 = Theme.Accent }) end
         end
         entry.activate = activate
-        onAccent(function(c)
-            if ic and container.Visible then ic.ImageColor3 = c end
-        end)
         btn.MouseButton1Click:Connect(activate)
         btn.MouseEnter:Connect(function()
             if not container.Visible then tween(btn, 0.12, { BackgroundTransparency = 0.6 }) end
@@ -1833,6 +1592,7 @@ function _Catalyst:Window(opt)
         return capi
     end
 
+    -- Notifications
     local notifyHolder = Instance.new("Frame")
     notifyHolder.AnchorPoint = Vector2.new(1, 1)
     notifyHolder.Position = UDim2.new(1, -16, 1, -16)
@@ -1861,10 +1621,11 @@ function _Catalyst:Window(opt)
         bar.Size = UDim2.new(0, 4, 1, -12)
         bar.Position = UDim2.new(0, 6, 0, 6)
         bar.BorderSizePixel = 0
+        bar.BackgroundColor3 = Theme.Accent
+        registerThemeObject(bar, "Accent", "BackgroundColor3")
         bar.BackgroundTransparency = 1
         bar.Parent = card
         corner(bar, 2)
-        regAccent(bar, "BackgroundColor3")
 
         local t = Instance.new("TextLabel")
         t.BackgroundTransparency = 1
@@ -1912,7 +1673,7 @@ function _Catalyst:Window(opt)
         end)
     end
 
-    -- Config system
+    -- Config
     local function readMeta()
         local raw = FileSystem.read(ConfigFolder .. "/_meta.json")
         if raw then
@@ -1975,7 +1736,7 @@ function _Catalyst:Window(opt)
         end
     end
 
-    -- Settings panel
+    -- Settings
     if settingsPanel then
         local settingsScroll = Instance.new("ScrollingFrame")
         settingsScroll.Size = UDim2.new(1, 0, 1, 0)
@@ -1984,7 +1745,8 @@ function _Catalyst:Window(opt)
         settingsScroll.ScrollBarThickness = 4
         settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         settingsScroll.Parent = settingsPanel.body
-        regAccent(settingsScroll, "ScrollBarImageColor3")
+        settingsScroll.ScrollBarImageColor3 = Theme.Accent
+        registerThemeObject(settingsScroll, "Accent", "ScrollBarImageColor3")
         local sApi = makeAPI(settingsScroll)
 
         local currentName = ""
@@ -2029,7 +1791,10 @@ function _Catalyst:Window(opt)
         end)
 
         sApi:Section("Appearance")
-        sApi:Colorpicker("Accent Color", Theme.Accent, function(c) setAccent(c) end, "_accent")
+        sApi:Colorpicker("Accent Color", Theme.Accent, function(c)
+            Theme.Accent = c
+            applyTheme(Theme)
+        end, "_accent")
         sApi:Slider("UI Scale", "Resize the whole interface", 50, 150, 100, function(v)
             userScale = v / 100
             applyScale()
@@ -2039,7 +1804,8 @@ function _Catalyst:Window(opt)
         sApi:Section("Theme Presets")
         for name, _ in pairs(PresetThemes) do
             sApi:Button(name, "Apply the " .. name .. " theme", function()
-                Window:SetTheme(name)
+                applyTheme(name)
+                Window:Notify("Theme", name .. " theme applied!", 1.5)
             end)
         end
 
@@ -2063,7 +1829,8 @@ function _Catalyst:Window(opt)
         local ring = Instance.new("UIStroke")
         ring.Thickness = 2
         ring.Parent = fab
-        regAccent(ring, "Color")
+        ring.Color = Theme.Accent
+        registerThemeObject(ring, "Accent", "Color")
 
         local fabUrl = opt.FabImageUrl or "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
         taskLib.spawn(function()
@@ -2113,7 +1880,10 @@ function _Catalyst:Window(opt)
         if alive() and not didInit then Window:Init() end
     end)
 
-    Window.SetAccent = setAccent
+    Window.SetAccent = function(c)
+        Theme.Accent = c
+        applyTheme(Theme)
+    end
     Window.Toggle    = toggleUI
     Window.Relayout  = function() relayout(true) end
 

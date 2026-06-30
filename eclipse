@@ -1,4 +1,4 @@
--- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings)
+-- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings & EdgeDrag)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -30,17 +30,58 @@ local function alive() return genv.__CatalystGen == MY_GEN end
 
 local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
-local Theme = {
-    Window  = Color3.fromRGB(18, 18, 21),
-    Panel   = Color3.fromRGB(24, 24, 28),
-    Header  = Color3.fromRGB(31, 31, 37),
-    Element = Color3.fromRGB(35, 35, 41),
-    Hover   = Color3.fromRGB(46, 46, 54),
-    Stroke  = Color3.fromRGB(50, 50, 60),
-    Text    = Color3.fromRGB(237, 237, 243),
-    SubText = Color3.fromRGB(140, 140, 152),
-    Accent  = Color3.fromRGB(255, 42, 74),
+-- =========================================================
+-- THÈMES PRÉDÉFINIS
+-- =========================================================
+local PresetThemes = {
+    Default = {
+        Window  = Color3.fromRGB(18, 18, 21),
+        Panel   = Color3.fromRGB(24, 24, 28),
+        Header  = Color3.fromRGB(31, 31, 37),
+        Element = Color3.fromRGB(35, 35, 41),
+        Hover   = Color3.fromRGB(46, 46, 54),
+        Stroke  = Color3.fromRGB(50, 50, 60),
+        Text    = Color3.fromRGB(237, 237, 243),
+        SubText = Color3.fromRGB(140, 140, 152),
+        Accent  = Color3.fromRGB(255, 42, 74),
+    },
+    Ocean = {
+        Window  = Color3.fromRGB(10, 20, 35),
+        Panel   = Color3.fromRGB(14, 26, 44),
+        Header  = Color3.fromRGB(20, 34, 56),
+        Element = Color3.fromRGB(26, 40, 64),
+        Hover   = Color3.fromRGB(40, 58, 85),
+        Stroke  = Color3.fromRGB(60, 85, 120),
+        Text    = Color3.fromRGB(210, 230, 255),
+        SubText = Color3.fromRGB(130, 160, 200),
+        Accent  = Color3.fromRGB(80, 180, 255),
+    },
+    Midnight = {
+        Window  = Color3.fromRGB(10, 10, 10),
+        Panel   = Color3.fromRGB(18, 18, 18),
+        Header  = Color3.fromRGB(25, 25, 25),
+        Element = Color3.fromRGB(32, 32, 32),
+        Hover   = Color3.fromRGB(44, 44, 44),
+        Stroke  = Color3.fromRGB(60, 60, 60),
+        Text    = Color3.fromRGB(230, 230, 230),
+        SubText = Color3.fromRGB(150, 150, 150),
+        Accent  = Color3.fromRGB(255, 180, 0),
+    },
+    Crimson = {
+        Window  = Color3.fromRGB(20, 5, 5),
+        Panel   = Color3.fromRGB(30, 8, 8),
+        Header  = Color3.fromRGB(40, 12, 12),
+        Element = Color3.fromRGB(50, 16, 16),
+        Hover   = Color3.fromRGB(70, 24, 24),
+        Stroke  = Color3.fromRGB(100, 40, 40),
+        Text    = Color3.fromRGB(255, 220, 220),
+        SubText = Color3.fromRGB(200, 140, 140),
+        Accent  = Color3.fromRGB(255, 60, 60),
+    },
 }
+
+local Theme = {}
+for k, v in pairs(PresetThemes.Default) do Theme[k] = v end
 _Catalyst.Theme = Theme
 
 local AccentObjects   = {}
@@ -67,11 +108,27 @@ end
 
 local function applyTheme(customTheme)
     if not customTheme then return end
-    for k, v in pairs(customTheme) do
-        if Theme[k] and typeof(v) == "Color3" then
-            Theme[k] = v
-            if k == "Accent" then
-                setAccent(v)  -- déclenche les listeners
+    if type(customTheme) == "string" then
+        local preset = PresetThemes[customTheme]
+        if preset then
+            for k, v in pairs(preset) do
+                Theme[k] = v
+            end
+            -- déclencher listeners pour Accent
+            for _, e in ipairs(AccentObjects) do
+                if e.obj and e.obj.Parent then
+                    pcall(function() e.obj[e.prop] = Theme.Accent end)
+                end
+            end
+            for _, fn in ipairs(AccentListeners) do pcall(fn, Theme.Accent) end
+        end
+    elseif type(customTheme) == "table" then
+        for k, v in pairs(customTheme) do
+            if Theme[k] and typeof(v) == "Color3" then
+                Theme[k] = v
+                if k == "Accent" then
+                    setAccent(v)
+                end
             end
         end
     end
@@ -1157,7 +1214,7 @@ function _Catalyst:Window(opt)
     local ConfigFolder = opt.ConfigFolder or "_CatalystConfigs"
     local ToggleKey    = opt.ToggleKey or opt.CloseBind or Enum.KeyCode.RightAlt
 
-    -- Appliquer le thème personnalisé avant toute création d'UI
+    -- Appliquer le thème (string ou table)
     applyTheme(opt.Theme)
     if opt.Accent then setAccent(opt.Accent) end
 
@@ -1175,7 +1232,7 @@ function _Catalyst:Window(opt)
     local Window = {}
 
     -- =========================================================
-    -- SPLASH SCREEN (personnalisable)
+    -- SPLASH SCREEN
     -- =========================================================
     local splashOpt = opt.Splash
     if splashOpt ~= false then
@@ -1243,7 +1300,6 @@ function _Catalyst:Window(opt)
         splashAccentLine.ZIndex = 102
         splashAccentLine.Parent = splashScreen
 
-        -- Chargement de l'image
         taskLib.spawn(function()
             pcall(function()
                 if writefile and getcustomasset and game.HttpGet then
@@ -1257,7 +1313,6 @@ function _Catalyst:Window(opt)
             end)
         end)
 
-        -- Animation
         taskLib.spawn(function()
             taskLib.wait(0.2)
             tween(splashImage, 1.2, { ImageTransparency = 0.05 })
@@ -1266,7 +1321,6 @@ function _Catalyst:Window(opt)
             tween(splashAccentLine, 1.0, { Size = UDim2.new(0, 250, 0, 2) })
 
             taskLib.wait(splashDuration)
-            -- Disparition
             tween(splashScreen, 0.8, { BackgroundTransparency = 1 })
             tween(splashImage, 0.8, { ImageTransparency = 1 })
             tween(overlay, 0.8, { BackgroundTransparency = 1 })
@@ -1292,6 +1346,46 @@ function _Catalyst:Window(opt)
     MainFrame.Parent = ScreenGui
     corner(MainFrame, 10)
     stroke(MainFrame, Theme.Stroke, 1, 0.2)
+
+    -- Ajout des poignées de drag sur les bords (gauche, droite, bas)
+    local function createEdgeDragHandle(anchor, size, position)
+        local handle = Instance.new("TextButton")
+        handle.BackgroundTransparency = 1
+        handle.Text = ""
+        handle.AutoButtonColor = false
+        handle.Size = size
+        handle.Position = position
+        handle.ZIndex = 10  -- au-dessus des panneaux mais sous le contenu interactif
+        handle.Parent = MainFrame
+
+        local dragging, startInput, startPos = false, nil, nil
+        handle.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                startInput = i.Position
+                startPos = MainFrame.Position
+            end
+        end)
+        handle.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if not alive() then return end
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                local delta = i.Position - startInput
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale, snap(startPos.X.Offset + delta.X),
+                    startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
+                )
+            end
+        end)
+    end
+
+    createEdgeDragHandle("Left",  UDim2.new(0, 12, 1, -24), UDim2.new(0, 0, 0, 12))
+    createEdgeDragHandle("Right", UDim2.new(0, 12, 1, -24), UDim2.new(1, -12, 0, 12))
+    createEdgeDragHandle("Bottom", UDim2.new(1, -24, 0, 12), UDim2.new(0, 12, 1, -12))
 
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = 0
@@ -1390,7 +1484,6 @@ function _Catalyst:Window(opt)
     local tabsPanel     = makePanel("MENU")
     local contentPanel  = makePanel(Title)
 
-    -- Sous-titre dans le contentPanel
     do
         contentPanel.title.Size = UDim2.new(1, -44, 0, 18)
         contentPanel.title.Position = UDim2.new(0, 28, 0, 4)
@@ -1407,7 +1500,6 @@ function _Catalyst:Window(opt)
         sub.Parent = contentPanel.header
     end
 
-    -- Settings panel (optionnel)
     local settingsPanel = nil
     if not HideSettings then
         settingsPanel = makePanel("SETTINGS")
@@ -1471,23 +1563,20 @@ function _Catalyst:Window(opt)
 
     local function relayout(animated)
         local rect = { x = PAD, y = PAD, w = WIN_W - 2 * PAD, h = WIN_H - 2 * PAD }
-        -- Tabs left
         placeFrame(tabsPanel.frame, rect.x, rect.y, SIDE_W, rect.h, animated)
         rect.x = rect.x + SIDE_W + GAP
         rect.w = rect.w - SIDE_W - GAP
 
-        -- Settings right (if present)
         if settingsPanel then
             placeFrame(settingsPanel.frame, rect.x + rect.w - SIDE_W, rect.y, SIDE_W, rect.h, animated)
             rect.w = rect.w - SIDE_W - GAP
         end
 
-        -- Content center
         placeFrame(contentPanel.frame, rect.x, rect.y, rect.w, rect.h, animated)
         refreshTabList()
     end
 
-    -- Window dragging
+    -- Window dragging (barre de titre)
     do
         local dragging, startInput, startPos = false, nil, nil
         contentPanel.header.InputBegan:Connect(function(i)
@@ -1745,7 +1834,6 @@ function _Catalyst:Window(opt)
         end
     end
 
-    -- Settings content (only if panel exists)
     if settingsPanel then
         local settingsScroll = Instance.new("ScrollingFrame")
         settingsScroll.Size = UDim2.new(1, 0, 1, 0)
@@ -1766,55 +1854,53 @@ function _Catalyst:Window(opt)
             currentName = v
             nameBox.Set(v)
         end)
-        sApi:Button("Save Config", "Write current settings to a file", function()
-            if currentName == "" then
-                Window:Notify("Config", "Type a config name first.")
-                return
-            end
+        sApi:Button("Save Config", "", function()
+            if currentName == "" then Window:Notify("Config", "Nom requis") return end
             local ok = Window:SaveConfig(currentName)
             cfgDrop.Refresh(getConfigList())
-            Window:Notify("Config", ok and ("Saved '" .. currentName .. "'") or "Save failed.")
+            Window:Notify("Config", ok and "Sauvegardé" or "Erreur")
         end)
-        sApi:Button("Load Config", "Apply settings from the selected file", function()
-            if currentName == "" then
-                Window:Notify("Config", "Select or type a config name first.")
-                return
-            end
+        sApi:Button("Load Config", "", function()
+            if currentName == "" then Window:Notify("Config", "Nom requis") return end
             local ok = Window:LoadConfig(currentName)
-            Window:Notify("Config", ok and ("Loaded '" .. currentName .. "'") or "Load failed.")
+            Window:Notify("Config", ok and "Chargé" or "Erreur")
         end)
-        sApi:Button("Delete Config", "Remove the selected config file", function()
+        sApi:Button("Delete Config", "", function()
             if currentName == "" then return end
             Window:DeleteConfig(currentName)
             cfgDrop.Refresh(getConfigList())
-            Window:Notify("Config", "Deleted '" .. currentName .. "'")
+            Window:Notify("Config", "Supprimé")
         end)
-        sApi:Button("Refresh List", "Re-scan the config folder", function()
+        sApi:Button("Refresh List", "", function()
             cfgDrop.Refresh(getConfigList())
-            Window:Notify("Config", "Config list refreshed.")
         end)
 
         local meta0 = readMeta()
-        sApi:Toggle("Auto-load Recent", "Load the last used config on launch",
-            meta0.autoload ~= false, function(on)
-                writeMeta({ autoload = on })
-            end)
-        sApi:Button("Reset to Defaults", "Restore every option to default values", function()
+        sApi:Toggle("Auto-load Recent", "", meta0.autoload ~= false, function(on)
+            writeMeta({ autoload = on })
+        end)
+        sApi:Button("Reset to Defaults", "", function()
             Window:ResetDefaults()
-            Window:Notify("Config", "All settings reset to defaults.")
+            Window:Notify("Config", "Réinitialisé")
         end)
 
         sApi:Section("Appearance")
-        sApi:Colorpicker("Accent Color", Theme.Accent, function(c)
-            setAccent(c)
-        end, "_accent")
-        sApi:Slider("UI Scale", "Resize the whole interface", 50, 150, 100, function(v)
+        sApi:Colorpicker("Accent", Theme.Accent, function(c) setAccent(c) end, "_accent")
+        sApi:Slider("UI Scale", "Échelle", 50, 150, 100, function(v)
             userScale = v / 100
             applyScale()
         end, "_uiscale", { Suffix = " %" })
-        sApi:Bind("Toggle UI Key", ToggleKey, function()
-            toggleUI()
-        end, "_togglekey")
+        sApi:Bind("Toggle Key", ToggleKey, function() toggleUI() end, "_togglekey")
+
+        sApi:Section("Theme Presets")
+        for name, _ in pairs(PresetThemes) do
+            sApi:Button(name, "Appliquer le thème " .. name, function()
+                applyTheme(name)
+                -- Recolorer les éléments déjà existants ? Ici on ne recolore pas dynamiquement les panels déjà créés.
+                -- On peut avertir que le changement prend effet après redémarrage, ou forcer une mise à jour.
+                Window:Notify("Thème", "Thème " .. name .. " appliqué (redémarrez pour tout voir)")
+            end)
+        end
 
         sApi:Section("About")
         sApi:Label("_Catalyst " .. _Catalyst.Version)
@@ -1822,7 +1908,7 @@ function _Catalyst:Window(opt)
         sApi:Label(IS_MOBILE and "Mode: mobile / touch" or "Mode: desktop")
     end
 
-    -- Bouton mobile (FAB) avec chargement dynamique
+    -- Mobile FAB
     if IS_MOBILE then
         local fab = Instance.new("ImageButton")
         fab.Size = UDim2.new(0, 48, 0, 48)
@@ -1860,12 +1946,20 @@ function _Catalyst:Window(opt)
         end)
     end
 
+    function Window:SetTheme(theme)
+        applyTheme(theme)
+        -- Forcer la mise à jour des couleurs de fond des éléments existants
+        -- Ici on pourrait parcourir les descendants de MainFrame et réaffecter les BackgroundColor3 selon le thème,
+        -- mais c'est complexe car certains éléments ont des couleurs fixes. On conseille de redémarrer l'UI.
+        -- On va quand même mettre à jour les éléments marqués (AccentObjects déjà fait via setAccent).
+        -- Pour les autres couleurs (Panel, Element...), on laisse l'utilisateur recréer la fenêtre si besoin.
+    end
+
     local didInit = false
     function Window:Init()
         if didInit then return end
         didInit = true
         if settingsPanel then
-            -- refresh config list only if settings exist
             cfgDrop.Refresh(getConfigList())
             local meta = readMeta()
             if meta.autoload ~= false and meta.recent then

@@ -1,4 +1,4 @@
--- _Catalyst GX 2.2 (Full Themes, EdgeDrag, English)
+-- _Catalyst GX 2.2 (Full Themes, Fixed Drag)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -172,6 +172,46 @@ local Theme = {}
 for k, v in pairs(PresetThemes.Default) do Theme[k] = v end
 _Catalyst.Theme = Theme
 
+-- =========================================================
+-- THEME SYSTEM
+-- =========================================================
+local ThemeTagged = {}      -- {obj, prop} for static elements
+local DynamicComponents = {} -- functions to reapply active states
+
+local function tagTheme(obj, prop)
+    table.insert(ThemeTagged, {obj = obj, prop = prop})
+    if Theme[prop] then
+        pcall(function() obj[prop] = Theme[prop] end)
+    end
+end
+
+local function applyTheme(customTheme)
+    if not customTheme then return end
+    if type(customTheme) == "string" then
+        local preset = PresetThemes[customTheme]
+        if preset then
+            for k, v in pairs(preset) do Theme[k] = v end
+        end
+    elseif type(customTheme) == "table" then
+        for k, v in pairs(customTheme) do
+            if Theme[k] and typeof(v) == "Color3" then Theme[k] = v end
+        end
+    end
+    -- Mettre à jour les éléments statiques
+    for _, tag in ipairs(ThemeTagged) do
+        if tag.obj and tag.obj.Parent and Theme[tag.prop] then
+            pcall(function() tag.obj[tag.prop] = Theme[tag.prop] end)
+        end
+    end
+    -- Rafraîchir les composants dynamiques (toggles, sliders…)
+    for _, fn in ipairs(DynamicComponents) do
+        pcall(fn)
+    end
+end
+
+-- =========================================================
+-- HELPERS
+-- =========================================================
 local AccentObjects   = {}
 local AccentListeners = {}
 local function regAccent(obj, prop)
@@ -189,52 +229,7 @@ local function setAccent(c)
             pcall(function() e.obj[e.prop] = c end)
         end
     end
-    for _, fn in ipairs(AccentListeners) do
-        pcall(fn, c)
-    end
-end
-
-local ThemeTagged = {}  -- list of {obj, prop}
-
-local function tagTheme(obj, prop)
-    table.insert(ThemeTagged, {obj = obj, prop = prop})
-    -- set initial value
-    if Theme[prop] then
-        pcall(function() obj[prop] = Theme[prop] end)
-    end
-end
-
-local function applyTheme(customTheme)
-    if not customTheme then return end
-    if type(customTheme) == "string" then
-        local preset = PresetThemes[customTheme]
-        if preset then
-            for k, v in pairs(preset) do
-                Theme[k] = v
-            end
-        end
-    elseif type(customTheme) == "table" then
-        for k, v in pairs(customTheme) do
-            if Theme[k] and typeof(v) == "Color3" then
-                Theme[k] = v
-            end
-        end
-    end
-    -- Update all tagged elements
-    for _, tag in ipairs(ThemeTagged) do
-        if tag.obj and tag.obj.Parent and Theme[tag.prop] then
-            pcall(function()
-                tag.obj[tag.prop] = Theme[tag.prop]
-            end)
-        end
-    end
-    -- Update accent objects
-    for _, e in ipairs(AccentObjects) do
-        if e.obj and e.obj.Parent then
-            pcall(function() e.obj[e.prop] = Theme.Accent end)
-        end
-    end
-    for _, fn in ipairs(AccentListeners) do pcall(fn, Theme.Accent) end
+    for _, fn in ipairs(AccentListeners) do pcall(fn, c) end
 end
 
 local function corner(o, r)
@@ -272,22 +267,34 @@ local function pad(o, all)
     return p
 end
 
-local function makeDrag(target, onMove)
-    local dragInput
+-- Drag fiable (barre de titre + bords)
+local function makeDrag(target, getMainFrame)
+    local dragStartInput, dragStartPos
+    local dragConn
     target.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-            onMove(input.Position)
-        end
-    end)
-    target.InputChanged:Connect(function(input)
-        if input == dragInput then
-            onMove(input.Position)
+            dragStartInput = input.Position
+            dragStartPos = getMainFrame().Position
+            dragConn = RunService.RenderStepped:Connect(function()
+                if dragStartInput then
+                    local delta = UserInputService:GetMouseLocation() - dragStartInput
+                    local newPos = UDim2.new(
+                        dragStartPos.X.Scale,
+                        math.floor(dragStartPos.X.Offset + delta.X / 2) * 2,
+                        dragStartPos.Y.Scale,
+                        math.floor(dragStartPos.Y.Offset + delta.Y / 2) * 2
+                    )
+                    getMainFrame().Position = newPos
+                else
+                    dragConn:Disconnect()
+                end
+            end)
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input == dragInput then
-            dragInput = nil
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragStartInput = nil
+            if dragConn then dragConn:Disconnect() end
         end
     end)
 end
@@ -297,6 +304,9 @@ local function roundTo(n, d)
     return math.floor(n * m + 0.5) / m
 end
 
+-- =========================================================
+-- FILE SYSTEM (inchangé)
+-- =========================================================
 local FileSystem = {}
 do
     local hasIO = (typeof(writefile) == "function")
@@ -413,6 +423,9 @@ local function deserialize(v)
     return v
 end
 
+-- =========================================================
+-- API DE CONSTRUCTION (avec enregistrement dynamique)
+-- =========================================================
 local function makeAPI(scroll)
     local layout = Instance.new("UIListLayout")
     layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -686,6 +699,16 @@ local function makeAPI(scroll)
             if flag then _Catalyst.Flags[flag] = state end
             if fire then pcall(callback, state) end
         end
+
+        -- Sauvegarde pour mise à jour après changement de thème
+        local function refresh()
+            if pill and pill.Parent then
+                pill.BackgroundColor3 = state and Theme.Accent or Theme.Stroke
+                knob.Position = UDim2.new(state and 1 or 0, state and -18 or 2, 0.5, 0)
+            end
+        end
+        table.insert(DynamicComponents, refresh)
+
         onAccent(function(c)
             if state then pill.BackgroundColor3 = c end
         end)
@@ -860,10 +883,38 @@ local function makeAPI(scroll)
             setAlpha((v - min) / (max - min), fire)
         end
 
-        makeDrag(track, function(posV)
-            local a = (posV.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
-            setAlpha(a, true)
+        -- Drag du slider
+        makeDrag(track, function() end)  -- le onMove sera redéfini ci-dessous
+        local dragStartInput, dragStartPos
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragStartInput = input.Position
+                local conn
+                conn = RunService.RenderStepped:Connect(function()
+                    if dragStartInput then
+                        local pos = UserInputService:GetMouseLocation()
+                        local a = (pos.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
+                        setAlpha(a, true)
+                    else
+                        conn:Disconnect()
+                    end
+                end)
+            end
         end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragStartInput = nil
+            end
+        end)
+
+        -- Mise à jour après changement de thème
+        local function refresh()
+            fill.BackgroundColor3 = Theme.Accent
+            knob.BackgroundColor3 = Theme.Text
+            valLbl.TextColor3 = Theme.Text
+            -- pas besoin de recalculer la position
+        end
+        table.insert(DynamicComponents, refresh)
 
         setValue(default, false)
         if flag then
@@ -995,6 +1046,17 @@ local function makeAPI(scroll)
                                        Default = default }
             _Catalyst.Flags[flag] = selected
         end
+
+        -- Rafraîchir les items après changement de thème
+        local function refresh()
+            for _, it in ipairs(items) do
+                if it.Parent then
+                    it.BackgroundColor3 = Theme.Panel
+                    it.TextColor3 = Theme.SubText
+                end
+            end
+        end
+        table.insert(DynamicComponents, refresh)
 
         return {
             Get = function() return selected end,
@@ -1166,6 +1228,18 @@ local function makeAPI(scroll)
             _Catalyst.Flags[flag] = default
         end
         pcall(callback, default)
+
+        -- Rafraîchir après changement de thème
+        local function refresh()
+            if not rainbow then
+                swatch.BackgroundColor3 = Color3.fromHSV(h, s, v)
+                box.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+            end
+            rbPill.BackgroundColor3 = rainbow and Theme.Accent or Theme.Stroke
+            rbKnob.BackgroundColor3 = Theme.Text
+        end
+        table.insert(DynamicComponents, refresh)
+
         return {
             Get = function() return Color3.fromHSV(h, s, v) end,
             Set = function(c) h, s, v = Color3.toHSV(c) apply(true) end,
@@ -1334,6 +1408,9 @@ local function makeAPI(scroll)
     return api
 end
 
+-- =========================================================
+-- FENÊTRE PRINCIPALE
+-- =========================================================
 function _Catalyst:Window(opt)
     if type(opt) == "string" then opt = { Title = opt } end
     opt = opt or {}
@@ -1343,10 +1420,8 @@ function _Catalyst:Window(opt)
     local ConfigFolder = opt.ConfigFolder or "_CatalystConfigs"
     local ToggleKey    = opt.ToggleKey or opt.CloseBind or Enum.KeyCode.RightAlt
 
-    -- Apply initial theme
     applyTheme(opt.Theme)
     if opt.Accent then setAccent(opt.Accent) end
-
     FileSystem.makeFolder(ConfigFolder)
 
     local HideSettings = opt.HideSettings == true
@@ -1359,9 +1434,7 @@ function _Catalyst:Window(opt)
 
     local Window = {}
 
-    -- =========================================================
-    -- SPLASH SCREEN
-    -- =========================================================
+    -- Splash screen
     local splashOpt = opt.Splash
     if splashOpt ~= false then
         splashOpt = splashOpt or {}
@@ -1455,15 +1528,12 @@ function _Catalyst:Window(opt)
             tween(splashTitle, 0.5, { TextTransparency = 1 })
             tween(splashSub, 0.5, { TextTransparency = 1 })
             tween(splashAccentLine, 0.5, { BackgroundTransparency = 1 })
-
             taskLib.wait(1.0)
             splashScreen:Destroy()
         end)
     end
 
-    -- =========================================================
-    -- MAIN UI
-    -- =========================================================
+    -- Main frame
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1486,11 +1556,7 @@ function _Catalyst:Window(opt)
         handle.Position = position
         handle.ZIndex = 10
         handle.Parent = MainFrame
-
-        makeDrag(handle, function(posV)
-            local delta = posV - MainFrame.AbsolutePosition
-            MainFrame.Position = UDim2.fromOffset(snap(MainFrame.AbsolutePosition.X + delta.X), snap(MainFrame.AbsolutePosition.Y + delta.Y))
-        end)
+        makeDrag(handle, function() return MainFrame end)
     end
     createEdgeDragHandle(UDim2.new(0, 0, 0, 12), UDim2.new(0, 12, 1, -24))
     createEdgeDragHandle(UDim2.new(1, -12, 0, 12), UDim2.new(0, 12, 1, -24))
@@ -1619,13 +1685,6 @@ function _Catalyst:Window(opt)
         settingsPanel = makePanel("SETTINGS")
     end
 
-    local panels = {
-        Tabs     = { panel = tabsPanel,     edge = "Left",  order = 1 },
-    }
-    if settingsPanel then
-        panels.Settings = { panel = settingsPanel, edge = "Right", order = 1 }
-    end
-
     local tabScroll = Instance.new("ScrollingFrame")
     tabScroll.Size = UDim2.new(1, 0, 1, 0)
     tabScroll.BackgroundTransparency = 1
@@ -1643,7 +1702,7 @@ function _Catalyst:Window(opt)
     local tabs = {}
 
     local function refreshTabList()
-        local horiz = (panels.Tabs.edge == "Top" or panels.Tabs.edge == "Bottom")
+        local horiz = false  -- tabs on left, vertical
         tabLayout.FillDirection = horiz and Enum.FillDirection.Horizontal or Enum.FillDirection.Vertical
         for _, t in ipairs(tabs) do
             if horiz then
@@ -1691,10 +1750,7 @@ function _Catalyst:Window(opt)
     end
 
     -- Titlebar drag
-    makeDrag(contentPanel.header, function(posV)
-        local delta = posV - contentPanel.header.AbsolutePosition
-        MainFrame.Position = UDim2.fromOffset(snap(MainFrame.AbsolutePosition.X + delta.X), snap(MainFrame.AbsolutePosition.Y + delta.Y))
-    end)
+    makeDrag(contentPanel.header, function() return MainFrame end)
 
     local firstTab = true
     function Window:Tab(name, icon)
@@ -1867,6 +1923,7 @@ function _Catalyst:Window(opt)
         end)
     end
 
+    -- Config system
     local function readMeta()
         local raw = FileSystem.read(ConfigFolder .. "/_meta.json")
         if raw then
@@ -1929,7 +1986,7 @@ function _Catalyst:Window(opt)
         end
     end
 
-    -- Settings panel (if enabled)
+    -- Settings panel
     if settingsPanel then
         local settingsScroll = Instance.new("ScrollingFrame")
         settingsScroll.Size = UDim2.new(1, 0, 1, 0)

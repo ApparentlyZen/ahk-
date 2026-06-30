@@ -1,4 +1,4 @@
--- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings & EdgeDrag & English & Full Theme Apply)
+-- _Catalyst GX 2.2 (Full Themes, EdgeDrag, English)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -78,6 +78,94 @@ local PresetThemes = {
         SubText = Color3.fromRGB(200, 140, 140),
         Accent  = Color3.fromRGB(255, 60, 60),
     },
+    Emerald = {
+        Window  = Color3.fromRGB(5, 20, 10),
+        Panel   = Color3.fromRGB(8, 30, 15),
+        Header  = Color3.fromRGB(12, 40, 22),
+        Element = Color3.fromRGB(16, 50, 28),
+        Hover   = Color3.fromRGB(24, 70, 40),
+        Stroke  = Color3.fromRGB(40, 100, 60),
+        Text    = Color3.fromRGB(200, 255, 220),
+        SubText = Color3.fromRGB(120, 200, 150),
+        Accent  = Color3.fromRGB(50, 220, 100),
+    },
+    Sunset = {
+        Window  = Color3.fromRGB(30, 15, 10),
+        Panel   = Color3.fromRGB(45, 22, 15),
+        Header  = Color3.fromRGB(60, 30, 20),
+        Element = Color3.fromRGB(75, 38, 26),
+        Hover   = Color3.fromRGB(100, 52, 36),
+        Stroke  = Color3.fromRGB(140, 75, 52),
+        Text    = Color3.fromRGB(255, 235, 210),
+        SubText = Color3.fromRGB(220, 180, 140),
+        Accent  = Color3.fromRGB(255, 140, 50),
+    },
+    Aurora = {
+        Window  = Color3.fromRGB(12, 10, 35),
+        Panel   = Color3.fromRGB(18, 15, 50),
+        Header  = Color3.fromRGB(25, 22, 70),
+        Element = Color3.fromRGB(32, 28, 85),
+        Hover   = Color3.fromRGB(48, 40, 115),
+        Stroke  = Color3.fromRGB(75, 60, 160),
+        Text    = Color3.fromRGB(220, 220, 255),
+        SubText = Color3.fromRGB(160, 150, 220),
+        Accent  = Color3.fromRGB(140, 100, 255),
+    },
+    Frost = {
+        Window  = Color3.fromRGB(15, 20, 25),
+        Panel   = Color3.fromRGB(20, 28, 35),
+        Header  = Color3.fromRGB(28, 36, 46),
+        Element = Color3.fromRGB(34, 44, 56),
+        Hover   = Color3.fromRGB(48, 62, 78),
+        Stroke  = Color3.fromRGB(70, 90, 110),
+        Text    = Color3.fromRGB(230, 240, 255),
+        SubText = Color3.fromRGB(150, 170, 200),
+        Accent  = Color3.fromRGB(120, 200, 255),
+    },
+    Shadow = {
+        Window  = Color3.fromRGB(25, 25, 30),
+        Panel   = Color3.fromRGB(32, 32, 38),
+        Header  = Color3.fromRGB(40, 40, 48),
+        Element = Color3.fromRGB(48, 48, 58),
+        Hover   = Color3.fromRGB(64, 64, 76),
+        Stroke  = Color3.fromRGB(85, 85, 100),
+        Text    = Color3.fromRGB(210, 210, 220),
+        SubText = Color3.fromRGB(130, 130, 145),
+        Accent  = Color3.fromRGB(180, 130, 255),
+    },
+    Rose = {
+        Window  = Color3.fromRGB(35, 15, 25),
+        Panel   = Color3.fromRGB(50, 22, 35),
+        Header  = Color3.fromRGB(65, 30, 48),
+        Element = Color3.fromRGB(80, 38, 60),
+        Hover   = Color3.fromRGB(110, 52, 82),
+        Stroke  = Color3.fromRGB(150, 75, 115),
+        Text    = Color3.fromRGB(255, 210, 230),
+        SubText = Color3.fromRGB(220, 140, 170),
+        Accent  = Color3.fromRGB(255, 80, 150),
+    },
+    Neon = {
+        Window  = Color3.fromRGB(10, 10, 15),
+        Panel   = Color3.fromRGB(15, 15, 22),
+        Header  = Color3.fromRGB(20, 20, 30),
+        Element = Color3.fromRGB(25, 25, 38),
+        Hover   = Color3.fromRGB(35, 35, 52),
+        Stroke  = Color3.fromRGB(50, 50, 75),
+        Text    = Color3.fromRGB(230, 230, 255),
+        SubText = Color3.fromRGB(160, 160, 200),
+        Accent  = Color3.fromRGB(0, 255, 200),
+    },
+    Galaxy = {
+        Window  = Color3.fromRGB(8, 5, 25),
+        Panel   = Color3.fromRGB(12, 8, 40),
+        Header  = Color3.fromRGB(18, 12, 55),
+        Element = Color3.fromRGB(24, 16, 70),
+        Hover   = Color3.fromRGB(36, 24, 100),
+        Stroke  = Color3.fromRGB(55, 40, 140),
+        Text    = Color3.fromRGB(235, 225, 255),
+        SubText = Color3.fromRGB(170, 150, 220),
+        Accent  = Color3.fromRGB(200, 100, 255),
+    },
 }
 
 local Theme = {}
@@ -106,6 +194,16 @@ local function setAccent(c)
     end
 end
 
+local ThemeTagged = {}  -- list of {obj, prop}
+
+local function tagTheme(obj, prop)
+    table.insert(ThemeTagged, {obj = obj, prop = prop})
+    -- set initial value
+    if Theme[prop] then
+        pcall(function() obj[prop] = Theme[prop] end)
+    end
+end
+
 local function applyTheme(customTheme)
     if not customTheme then return end
     if type(customTheme) == "string" then
@@ -114,24 +212,29 @@ local function applyTheme(customTheme)
             for k, v in pairs(preset) do
                 Theme[k] = v
             end
-            -- déclencher listeners pour Accent
-            for _, e in ipairs(AccentObjects) do
-                if e.obj and e.obj.Parent then
-                    pcall(function() e.obj[e.prop] = Theme.Accent end)
-                end
-            end
-            for _, fn in ipairs(AccentListeners) do pcall(fn, Theme.Accent) end
         end
     elseif type(customTheme) == "table" then
         for k, v in pairs(customTheme) do
             if Theme[k] and typeof(v) == "Color3" then
                 Theme[k] = v
-                if k == "Accent" then
-                    setAccent(v)
-                end
             end
         end
     end
+    -- Update all tagged elements
+    for _, tag in ipairs(ThemeTagged) do
+        if tag.obj and tag.obj.Parent and Theme[tag.prop] then
+            pcall(function()
+                tag.obj[tag.prop] = Theme[tag.prop]
+            end)
+        end
+    end
+    -- Update accent objects
+    for _, e in ipairs(AccentObjects) do
+        if e.obj and e.obj.Parent then
+            pcall(function() e.obj[e.prop] = Theme.Accent end)
+        end
+    end
+    for _, fn in ipairs(AccentListeners) do pcall(fn, Theme.Accent) end
 end
 
 local function corner(o, r)
@@ -147,6 +250,7 @@ local function stroke(o, col, th, tr)
     s.Transparency = tr or 0
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     s.Parent = o
+    tagTheme(s, "Color")
     return s
 end
 local function tween(o, t, props, st, dir)
@@ -168,12 +272,12 @@ local function pad(o, all)
     return p
 end
 
-local function makeDrag(target, onMove, onEnd)
+local function makeDrag(target, onMove)
     local dragInput
-    local inputBeganConn = target.InputBegan:Connect(function(input)
+    target.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            onMove(input.Position)
             dragInput = input
+            onMove(input.Position)
         end
     end)
     target.InputChanged:Connect(function(input)
@@ -181,16 +285,11 @@ local function makeDrag(target, onMove, onEnd)
             onMove(input.Position)
         end
     end)
-    local inputEndedConn = UserInputService.InputEnded:Connect(function(input)
+    UserInputService.InputEnded:Connect(function(input)
         if input == dragInput then
             dragInput = nil
-            if onEnd then onEnd() end
         end
     end)
-    return function()
-        inputBeganConn:Disconnect()
-        inputEndedConn:Disconnect()
-    end
 end
 
 local function roundTo(n, d)
@@ -345,6 +444,7 @@ local function makeAPI(scroll)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, h)
         f.BackgroundColor3 = Theme.Element
+        tagTheme(f, "BackgroundColor3")
         f.BorderSizePixel = 0
         f.LayoutOrder = nextOrder()
         f.Parent = scroll
@@ -361,6 +461,7 @@ local function makeAPI(scroll)
         t.Font = Enum.Font.GothamMedium
         t.Text = text
         t.TextColor3 = Theme.Text
+        tagTheme(t, "TextColor3")
         t.TextSize = 14
         t.TextXAlignment = Enum.TextXAlignment.Left
         t.TextTruncate = Enum.TextTruncate.AtEnd
@@ -376,6 +477,7 @@ local function makeAPI(scroll)
         d.Font = Enum.Font.Gotham
         d.Text = text
         d.TextColor3 = Theme.SubText
+        tagTheme(d, "TextColor3")
         d.TextSize = 12
         d.TextWrapped = true
         d.TextTruncate = Enum.TextTruncate.AtEnd
@@ -416,6 +518,7 @@ local function makeAPI(scroll)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 28)
         f.BackgroundColor3 = Theme.Panel
+        tagTheme(f, "BackgroundColor3")
         f.BorderSizePixel = 0
         f.LayoutOrder = nextOrder()
         f.Parent = scroll
@@ -436,6 +539,7 @@ local function makeAPI(scroll)
         l.Font = Enum.Font.GothamBold
         l.Text = string.upper(text)
         l.TextColor3 = Theme.Text
+        tagTheme(l, "TextColor3")
         l.TextSize = 12
         l.TextXAlignment = Enum.TextXAlignment.Left
         l.TextTruncate = Enum.TextTruncate.AtEnd
@@ -450,6 +554,7 @@ local function makeAPI(scroll)
         chev.Text = ">"
         chev.Rotation = 90
         chev.TextColor3 = Theme.SubText
+        tagTheme(chev, "TextColor3")
         chev.TextSize = 13
         chev.Parent = f
 
@@ -490,6 +595,7 @@ local function makeAPI(scroll)
         l.Font = Enum.Font.Gotham
         l.Text = text
         l.TextColor3 = Theme.SubText
+        tagTheme(l, "TextColor3")
         l.TextSize = 13
         l.TextWrapped = true
         l.TextXAlignment = Enum.TextXAlignment.Left
@@ -501,6 +607,7 @@ local function makeAPI(scroll)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 1)
         f.BackgroundColor3 = Theme.Stroke
+        tagTheme(f, "BackgroundColor3")
         f.BorderSizePixel = 0
         f.LayoutOrder = nextOrder()
         f.Parent = scroll
@@ -523,6 +630,7 @@ local function makeAPI(scroll)
         arrow.Font = Enum.Font.GothamBold
         arrow.Text = ">"
         arrow.TextColor3 = Theme.SubText
+        tagTheme(arrow, "TextColor3")
         arrow.TextSize = 14
         arrow.Parent = card
 
@@ -555,6 +663,7 @@ local function makeAPI(scroll)
         pill.Position = UDim2.new(1, -14, cY[1], cY[2])
         pill.Size = UDim2.new(0, 40, 0, 20)
         pill.BackgroundColor3 = Theme.Stroke
+        tagTheme(pill, "BackgroundColor3")
         pill.BorderSizePixel = 0
         pill.Parent = card
         corner(pill, 10)
@@ -564,6 +673,7 @@ local function makeAPI(scroll)
         knob.AnchorPoint = Vector2.new(0, 0.5)
         knob.Size = UDim2.new(0, 16, 0, 16)
         knob.BackgroundColor3 = Theme.Text
+        tagTheme(knob, "BackgroundColor3")
         knob.BorderSizePixel = 0
         knob.Parent = pill
         corner(knob, 8)
@@ -590,6 +700,7 @@ local function makeAPI(scroll)
             chip.Position = UDim2.new(1, -62, cY[1], cY[2])
             chip.Size = UDim2.new(0, 48, 0, 22)
             chip.BackgroundColor3 = Theme.Panel
+            tagTheme(chip, "BackgroundColor3")
             chip.BorderSizePixel = 0
             chip.Parent = card
             corner(chip, 4)
@@ -602,6 +713,7 @@ local function makeAPI(scroll)
             chipLbl.Font = Enum.Font.GothamMedium
             chipLbl.Text = kbKey
             chipLbl.TextColor3 = Theme.SubText
+            tagTheme(chipLbl, "TextColor3")
             chipLbl.TextSize = 11
             chipLbl.TextTruncate = Enum.TextTruncate.AtEnd
             chipLbl.Parent = chip
@@ -697,6 +809,7 @@ local function makeAPI(scroll)
         valLbl.Font = Enum.Font.GothamBold
         valLbl.Text = fmt(default)
         valLbl.TextColor3 = Theme.Text
+        tagTheme(valLbl, "TextColor3")
         valLbl.TextSize = 13
         valLbl.TextXAlignment = Enum.TextXAlignment.Right
         valLbl.TextTruncate = Enum.TextTruncate.AtEnd
@@ -709,6 +822,7 @@ local function makeAPI(scroll)
         track.Position = UDim2.new(0, 12, 1, -13)
         track.Size = UDim2.new(1, -24, 0, 5)
         track.BackgroundColor3 = Theme.Stroke
+        tagTheme(track, "BackgroundColor3")
         track.BorderSizePixel = 0
         track.Parent = card
         corner(track, 3)
@@ -725,6 +839,7 @@ local function makeAPI(scroll)
         knob.Position = UDim2.new(0, 0, 0.5, 0)
         knob.Size = UDim2.new(0, 13, 0, 13)
         knob.BackgroundColor3 = Theme.Text
+        tagTheme(knob, "BackgroundColor3")
         knob.BorderSizePixel = 0
         knob.ZIndex = 3
         knob.Parent = track
@@ -745,15 +860,10 @@ local function makeAPI(scroll)
             setAlpha((v - min) / (max - min), fire)
         end
 
-        local function makeSliderDrag()
-            local dragConn
-            local function onSlide(posV)
-                local a = (posV.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
-                setAlpha(a, true)
-            end
-            dragConn = makeDrag(track, onSlide)
-        end
-        makeSliderDrag()
+        makeDrag(track, function(posV)
+            local a = (posV.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
+            setAlpha(a, true)
+        end)
 
         setValue(default, false)
         if flag then
@@ -779,6 +889,7 @@ local function makeAPI(scroll)
         title.Font = Enum.Font.GothamMedium
         title.Text = text
         title.TextColor3 = Theme.Text
+        tagTheme(title, "TextColor3")
         title.TextSize = 14
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.TextTruncate = Enum.TextTruncate.AtEnd
@@ -792,6 +903,7 @@ local function makeAPI(scroll)
         sel.Font = Enum.Font.Gotham
         sel.Text = default or "Select..."
         sel.TextColor3 = Theme.SubText
+        tagTheme(sel, "TextColor3")
         sel.TextSize = 13
         sel.TextXAlignment = Enum.TextXAlignment.Right
         sel.TextTruncate = Enum.TextTruncate.AtEnd
@@ -805,6 +917,7 @@ local function makeAPI(scroll)
         arrow.Font = Enum.Font.GothamBold
         arrow.Text = "v"
         arrow.TextColor3 = Theme.SubText
+        tagTheme(arrow, "TextColor3")
         arrow.TextSize = 12
         arrow.Parent = card
 
@@ -852,10 +965,12 @@ local function makeAPI(scroll)
             local it = Instance.new("TextButton")
             it.Size = UDim2.new(1, 0, 0, 25)
             it.BackgroundColor3 = Theme.Panel
+            tagTheme(it, "BackgroundColor3")
             it.AutoButtonColor = false
             it.Font = Enum.Font.Gotham
             it.Text = tostring(v)
             it.TextColor3 = Theme.SubText
+            tagTheme(it, "TextColor3")
             it.TextSize = 13
             it.TextTruncate = Enum.TextTruncate.AtEnd
             it.Parent = holder
@@ -965,6 +1080,7 @@ local function makeAPI(scroll)
         rbRow.Text = "Rainbow"
         rbRow.Font = Enum.Font.Gotham
         rbRow.TextColor3 = Theme.SubText
+        tagTheme(rbRow, "TextColor3")
         rbRow.TextSize = 13
         rbRow.TextXAlignment = Enum.TextXAlignment.Left
         rbRow.AutoButtonColor = false
@@ -974,6 +1090,7 @@ local function makeAPI(scroll)
         rbPill.Position = UDim2.new(1, 0, 0.5, 0)
         rbPill.Size = UDim2.new(0, 34, 0, 16)
         rbPill.BackgroundColor3 = Theme.Stroke
+        tagTheme(rbPill, "BackgroundColor3")
         rbPill.BorderSizePixel = 0
         rbPill.Parent = rbRow
         corner(rbPill, 8)
@@ -982,6 +1099,7 @@ local function makeAPI(scroll)
         rbKnob.AnchorPoint = Vector2.new(0, 0.5)
         rbKnob.Size = UDim2.new(0, 12, 0, 12)
         rbKnob.BackgroundColor3 = Theme.Text
+        tagTheme(rbKnob, "BackgroundColor3")
         rbKnob.BorderSizePixel = 0
         rbKnob.Parent = rbPill
         corner(rbKnob, 6)
@@ -1073,6 +1191,7 @@ local function makeAPI(scroll)
         modeLbl.Font = Enum.Font.Gotham
         modeLbl.Text = string.lower(mode)
         modeLbl.TextColor3 = Theme.SubText
+        tagTheme(modeLbl, "TextColor3")
         modeLbl.TextSize = 11
         modeLbl.TextXAlignment = Enum.TextXAlignment.Right
         modeLbl.Parent = card
@@ -1082,6 +1201,7 @@ local function makeAPI(scroll)
         box.Position = UDim2.new(1, -14, 0.5, 0)
         box.Size = UDim2.new(0, 84, 0, 24)
         box.BackgroundColor3 = Theme.Panel
+        tagTheme(box, "BackgroundColor3")
         box.BorderSizePixel = 0
         box.Parent = card
         corner(box, 4)
@@ -1093,6 +1213,7 @@ local function makeAPI(scroll)
         keyLbl.Font = Enum.Font.GothamMedium
         keyLbl.Text = key
         keyLbl.TextColor3 = Theme.SubText
+        tagTheme(keyLbl, "TextColor3")
         keyLbl.TextSize = 12
         keyLbl.TextTruncate = Enum.TextTruncate.AtEnd
         keyLbl.Parent = box
@@ -1113,7 +1234,7 @@ local function makeAPI(scroll)
             local conn
             conn = UserInputService.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.Keyboard then
-                    setKbKey(i.KeyCode)
+                    setKey(i.KeyCode)
                     listening = false
                     conn:Disconnect()
                 end
@@ -1168,6 +1289,7 @@ local function makeAPI(scroll)
         frame.Position = UDim2.new(0, 12, 1, -10)
         frame.Size = UDim2.new(1, -24, 0, 28)
         frame.BackgroundColor3 = Theme.Panel
+        tagTheme(frame, "BackgroundColor3")
         frame.BorderSizePixel = 0
         frame.Parent = card
         corner(frame, 4)
@@ -1181,6 +1303,7 @@ local function makeAPI(scroll)
         tb.PlaceholderText = "..."
         tb.Text = ""
         tb.TextColor3 = Theme.Text
+        tagTheme(tb, "TextColor3")
         tb.PlaceholderColor3 = Theme.SubText
         tb.TextSize = 13
         tb.ClearTextOnFocus = false
@@ -1220,7 +1343,7 @@ function _Catalyst:Window(opt)
     local ConfigFolder = opt.ConfigFolder or "_CatalystConfigs"
     local ToggleKey    = opt.ToggleKey or opt.CloseBind or Enum.KeyCode.RightAlt
 
-    -- Apply theme (string or table)
+    -- Apply initial theme
     applyTheme(opt.Theme)
     if opt.Accent then setAccent(opt.Accent) end
 
@@ -1231,17 +1354,13 @@ function _Catalyst:Window(opt)
     local WIN_W, WIN_H = 880, 540
     local PAD, GAP     = 12, 10
     local SIDE_W       = 250
-    local SIDE_H       = 150
     local GRID         = 16
     local function snap(n) return math.floor(n / GRID + 0.5) * GRID end
 
     local Window = {}
 
-    -- Store important UI references for theme recoloring
-    local UIReferences = {}
-
     -- =========================================================
-    -- SPLASH SCREEN (customizable)
+    -- SPLASH SCREEN
     -- =========================================================
     local splashOpt = opt.Splash
     if splashOpt ~= false then
@@ -1351,13 +1470,13 @@ function _Catalyst:Window(opt)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.Size = UDim2.fromOffset(WIN_W, WIN_H)
     MainFrame.BackgroundColor3 = Theme.Window
+    tagTheme(MainFrame, "BackgroundColor3")
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     corner(MainFrame, 10)
     stroke(MainFrame, Theme.Stroke, 1, 0.2)
-    table.insert(UIReferences, MainFrame)
 
-    -- Edge drag handles (fixed with robust drag)
+    -- Edge drag handles
     local function createEdgeDragHandle(position, size)
         local handle = Instance.new("TextButton")
         handle.BackgroundTransparency = 1
@@ -1368,37 +1487,14 @@ function _Catalyst:Window(opt)
         handle.ZIndex = 10
         handle.Parent = MainFrame
 
-        local dragInput
-        handle.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput = input
-                -- record start pos
-                local startPos = MainFrame.Position
-                local startInput = input.Position
-                local conn
-                conn = RunService.RenderStepped:Connect(function()
-                    if dragInput then
-                        local delta = dragInput.Position - startInput
-                        MainFrame.Position = UDim2.new(
-                            startPos.X.Scale, snap(startPos.X.Offset + delta.X),
-                            startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
-                        )
-                    else
-                        conn:Disconnect()
-                    end
-                end)
-            end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input == dragInput then
-                dragInput = nil
-            end
+        makeDrag(handle, function(posV)
+            local delta = posV - MainFrame.AbsolutePosition
+            MainFrame.Position = UDim2.fromOffset(snap(MainFrame.AbsolutePosition.X + delta.X), snap(MainFrame.AbsolutePosition.Y + delta.Y))
         end)
     end
-
-    createEdgeDragHandle(UDim2.new(0, 0, 0, 12), UDim2.new(0, 12, 1, -24))   -- Left
-    createEdgeDragHandle(UDim2.new(1, -12, 0, 12), UDim2.new(0, 12, 1, -24)) -- Right
-    createEdgeDragHandle(UDim2.new(0, 12, 1, -12), UDim2.new(1, -24, 0, 12)) -- Bottom
+    createEdgeDragHandle(UDim2.new(0, 0, 0, 12), UDim2.new(0, 12, 1, -24))
+    createEdgeDragHandle(UDim2.new(1, -12, 0, 12), UDim2.new(0, 12, 1, -24))
+    createEdgeDragHandle(UDim2.new(0, 12, 1, -12), UDim2.new(1, -24, 0, 12))
 
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = 0
@@ -1445,19 +1541,19 @@ function _Catalyst:Window(opt)
     local function makePanel(titleText)
         local f = Instance.new("Frame")
         f.BackgroundColor3 = Theme.Panel
+        tagTheme(f, "BackgroundColor3")
         f.BorderSizePixel = 0
         f.ClipsDescendants = true
         f.Parent = MainFrame
         corner(f, 8)
         stroke(f, Theme.Stroke, 1, 0.35)
-        table.insert(UIReferences, f)
 
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 32)
         header.BackgroundColor3 = Theme.Header
+        tagTheme(header, "BackgroundColor3")
         header.BorderSizePixel = 0
         header.Parent = f
-        table.insert(UIReferences, header)
 
         local accentLine = Instance.new("Frame")
         accentLine.Size = UDim2.new(1, 0, 0, 2)
@@ -1472,9 +1568,9 @@ function _Catalyst:Window(opt)
         grip.Font = Enum.Font.GothamBold
         grip.Text = "::"
         grip.TextColor3 = Theme.SubText
+        tagTheme(grip, "TextColor3")
         grip.TextSize = 14
         grip.Parent = header
-        table.insert(UIReferences, grip)
 
         local tl = Instance.new("TextLabel")
         tl.BackgroundTransparency = 1
@@ -1483,11 +1579,11 @@ function _Catalyst:Window(opt)
         tl.Font = Enum.Font.GothamBold
         tl.Text = titleText
         tl.TextColor3 = Theme.Text
+        tagTheme(tl, "TextColor3")
         tl.TextSize = 14
         tl.TextXAlignment = Enum.TextXAlignment.Left
         tl.TextTruncate = Enum.TextTruncate.AtEnd
         tl.Parent = header
-        table.insert(UIReferences, tl)
 
         local body = Instance.new("Frame")
         body.Position = UDim2.new(0, 0, 0, 32)
@@ -1511,11 +1607,11 @@ function _Catalyst:Window(opt)
         sub.Font = Enum.Font.Gotham
         sub.Text = SubTitle
         sub.TextColor3 = Theme.SubText
+        tagTheme(sub, "TextColor3")
         sub.TextSize = 11
         sub.TextXAlignment = Enum.TextXAlignment.Left
         sub.TextTruncate = Enum.TextTruncate.AtEnd
         sub.Parent = contentPanel.header
-        table.insert(UIReferences, sub)
     end
 
     local settingsPanel = nil
@@ -1543,7 +1639,6 @@ function _Catalyst:Window(opt)
     tabLayout.Padding = UDim.new(0, 5)
     tabLayout.Parent = tabScroll
     pad(tabScroll, 6)
-    table.insert(UIReferences, tabScroll)
 
     local tabs = {}
 
@@ -1595,34 +1690,11 @@ function _Catalyst:Window(opt)
         refreshTabList()
     end
 
-    -- Titlebar drag (using the new makeDrag function)
-    do
-        local dragInput
-        contentPanel.header.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput = input
-                local startPos = MainFrame.Position
-                local startInput = input.Position
-                local conn
-                conn = RunService.RenderStepped:Connect(function()
-                    if dragInput then
-                        local delta = dragInput.Position - startInput
-                        MainFrame.Position = UDim2.new(
-                            startPos.X.Scale, snap(startPos.X.Offset + delta.X),
-                            startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
-                        )
-                    else
-                        conn:Disconnect()
-                    end
-                end)
-            end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input == dragInput then
-                dragInput = nil
-            end
-        end)
-    end
+    -- Titlebar drag
+    makeDrag(contentPanel.header, function(posV)
+        local delta = posV - contentPanel.header.AbsolutePosition
+        MainFrame.Position = UDim2.fromOffset(snap(MainFrame.AbsolutePosition.X + delta.X), snap(MainFrame.AbsolutePosition.Y + delta.Y))
+    end)
 
     local firstTab = true
     function Window:Tab(name, icon)
@@ -1641,12 +1713,12 @@ function _Catalyst:Window(opt)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, 0, 0, 36)
         btn.BackgroundColor3 = Theme.Element
+        tagTheme(btn, "BackgroundColor3")
         btn.BackgroundTransparency = 1
         btn.AutoButtonColor = false
         btn.Text = ""
         btn.Parent = tabScroll
         corner(btn, 6)
-        table.insert(UIReferences, btn)
 
         local indicator = Instance.new("Frame")
         indicator.Size = UDim2.new(0, 3, 1, -12)
@@ -1665,8 +1737,8 @@ function _Catalyst:Window(opt)
             ic.Size = UDim2.new(0, 18, 0, 18)
             ic.Image = icon
             ic.ImageColor3 = Theme.SubText
+            tagTheme(ic, "ImageColor3")
             ic.Parent = btn
-            table.insert(UIReferences, ic)
         end
 
         local lbl = Instance.new("TextLabel")
@@ -1676,11 +1748,11 @@ function _Catalyst:Window(opt)
         lbl.Font = Enum.Font.GothamMedium
         lbl.Text = name
         lbl.TextColor3 = Theme.SubText
+        tagTheme(lbl, "TextColor3")
         lbl.TextSize = 14
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.TextTruncate = Enum.TextTruncate.AtEnd
         lbl.Parent = btn
-        table.insert(UIReferences, lbl)
 
         local entry = { container = container, btn = btn, lbl = lbl, indicator = indicator, icon = ic }
 
@@ -1857,50 +1929,6 @@ function _Catalyst:Window(opt)
         end
     end
 
-    -- Theme application function (recolors all UI elements)
-    local function applyThemeToUI()
-        -- Update all registered UI elements
-        for _, obj in ipairs(UIReferences) do
-            if obj:IsA("Frame") then
-                local name = obj.Name
-                -- Map object to theme color based on its original purpose (heuristic)
-                -- We'll use the stored "type" if available, otherwise skip.
-                -- Instead, we directly set the colors we know.
-            end
-        end
-        -- Since we can't easily map each object to its original theme key,
-        -- we'll rebuild the UI by re-setting the relevant colors on the main structures.
-        -- This is a brute force but reliable method.
-        MainFrame.BackgroundColor3 = Theme.Window
-        for _, child in ipairs(MainFrame:GetChildren()) do
-            if child:IsA("Frame") and child.Name ~= "MainFrame" then
-                if child:FindFirstChildOfClass("UICorner") then -- our panels
-                    child.BackgroundColor3 = Theme.Panel
-                    for _, sub in ipairs(child:GetChildren()) do
-                        if sub:IsA("Frame") and sub.Name ~= "Hit" then
-                            sub.BackgroundColor3 = Theme.Header
-                        elseif sub:IsA("TextLabel") then
-                            sub.TextColor3 = Theme.SubText
-                        end
-                    end
-                end
-            end
-        end
-        -- Also update tab buttons
-        for _, t in ipairs(tabs) do
-            t.btn.BackgroundColor3 = Theme.Element
-            t.lbl.TextColor3 = Theme.SubText
-            if t.icon then t.icon.ImageColor3 = Theme.SubText end
-        end
-        -- Notify
-        Window:Notify("Theme", "Theme applied.", 2)
-    end
-
-    function Window:SetTheme(theme)
-        applyTheme(theme)
-        applyThemeToUI()
-    end
-
     -- Settings panel (if enabled)
     if settingsPanel then
         local settingsScroll = Instance.new("ScrollingFrame")
@@ -2011,6 +2039,10 @@ function _Catalyst:Window(opt)
                 toggleUI()
             end
         end)
+    end
+
+    function Window:SetTheme(theme)
+        applyTheme(theme)
     end
 
     local didInit = false

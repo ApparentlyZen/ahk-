@@ -1,4 +1,4 @@
--- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings & EdgeDrag)
+-- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings & EdgeDrag & English)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -31,7 +31,7 @@ local function alive() return genv.__CatalystGen == MY_GEN end
 local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
 -- =========================================================
--- THÈMES PRÉDÉFINIS
+-- PRESET THEMES
 -- =========================================================
 local PresetThemes = {
     Default = {
@@ -1214,7 +1214,7 @@ function _Catalyst:Window(opt)
     local ConfigFolder = opt.ConfigFolder or "_CatalystConfigs"
     local ToggleKey    = opt.ToggleKey or opt.CloseBind or Enum.KeyCode.RightAlt
 
-    -- Appliquer le thème (string ou table)
+    -- Apply theme (string or table)
     applyTheme(opt.Theme)
     if opt.Accent then setAccent(opt.Accent) end
 
@@ -1232,7 +1232,7 @@ function _Catalyst:Window(opt)
     local Window = {}
 
     -- =========================================================
-    -- SPLASH SCREEN
+    -- SPLASH SCREEN (customizable)
     -- =========================================================
     local splashOpt = opt.Splash
     if splashOpt ~= false then
@@ -1334,7 +1334,7 @@ function _Catalyst:Window(opt)
     end
 
     -- =========================================================
-    -- INTERFACE PRINCIPALE
+    -- MAIN UI
     -- =========================================================
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
@@ -1347,7 +1347,7 @@ function _Catalyst:Window(opt)
     corner(MainFrame, 10)
     stroke(MainFrame, Theme.Stroke, 1, 0.2)
 
-    -- Ajout des poignées de drag sur les bords (gauche, droite, bas)
+    -- Edge drag handles
     local function createEdgeDragHandle(anchor, size, position)
         local handle = Instance.new("TextButton")
         handle.BackgroundTransparency = 1
@@ -1355,7 +1355,7 @@ function _Catalyst:Window(opt)
         handle.AutoButtonColor = false
         handle.Size = size
         handle.Position = position
-        handle.ZIndex = 10  -- au-dessus des panneaux mais sous le contenu interactif
+        handle.ZIndex = 10
         handle.Parent = MainFrame
 
         local dragging, startInput, startPos = false, nil, nil
@@ -1576,7 +1576,7 @@ function _Catalyst:Window(opt)
         refreshTabList()
     end
 
-    -- Window dragging (barre de titre)
+    -- Titlebar drag
     do
         local dragging, startInput, startPos = false, nil, nil
         contentPanel.header.InputBegan:Connect(function(i)
@@ -1834,6 +1834,7 @@ function _Catalyst:Window(opt)
         end
     end
 
+    -- Settings panel (if enabled)
     if settingsPanel then
         local settingsScroll = Instance.new("ScrollingFrame")
         settingsScroll.Size = UDim2.new(1, 0, 1, 0)
@@ -1854,51 +1855,51 @@ function _Catalyst:Window(opt)
             currentName = v
             nameBox.Set(v)
         end)
-        sApi:Button("Save Config", "", function()
-            if currentName == "" then Window:Notify("Config", "Nom requis") return end
+        sApi:Button("Save Config", "Write current settings to a file", function()
+            if currentName == "" then Window:Notify("Config", "Enter a name first.") return end
             local ok = Window:SaveConfig(currentName)
             cfgDrop.Refresh(getConfigList())
-            Window:Notify("Config", ok and "Sauvegardé" or "Erreur")
+            Window:Notify("Config", ok and ("Saved '" .. currentName .. "'") or "Save failed.")
         end)
-        sApi:Button("Load Config", "", function()
-            if currentName == "" then Window:Notify("Config", "Nom requis") return end
+        sApi:Button("Load Config", "Apply settings from the selected file", function()
+            if currentName == "" then Window:Notify("Config", "Select a config first.") return end
             local ok = Window:LoadConfig(currentName)
-            Window:Notify("Config", ok and "Chargé" or "Erreur")
+            Window:Notify("Config", ok and ("Loaded '" .. currentName .. "'") or "Load failed.")
         end)
-        sApi:Button("Delete Config", "", function()
+        sApi:Button("Delete Config", "Remove the selected config file", function()
             if currentName == "" then return end
             Window:DeleteConfig(currentName)
             cfgDrop.Refresh(getConfigList())
-            Window:Notify("Config", "Supprimé")
+            Window:Notify("Config", "Deleted '" .. currentName .. "'")
         end)
-        sApi:Button("Refresh List", "", function()
+        sApi:Button("Refresh List", "Re-scan the config folder", function()
             cfgDrop.Refresh(getConfigList())
+            Window:Notify("Config", "Config list refreshed.")
         end)
 
         local meta0 = readMeta()
-        sApi:Toggle("Auto-load Recent", "", meta0.autoload ~= false, function(on)
-            writeMeta({ autoload = on })
-        end)
-        sApi:Button("Reset to Defaults", "", function()
+        sApi:Toggle("Auto-load Recent", "Load the last used config on launch",
+            meta0.autoload ~= false, function(on)
+                writeMeta({ autoload = on })
+            end)
+        sApi:Button("Reset to Defaults", "Restore every option to default values", function()
             Window:ResetDefaults()
-            Window:Notify("Config", "Réinitialisé")
+            Window:Notify("Config", "All settings reset to defaults.")
         end)
 
         sApi:Section("Appearance")
-        sApi:Colorpicker("Accent", Theme.Accent, function(c) setAccent(c) end, "_accent")
-        sApi:Slider("UI Scale", "Échelle", 50, 150, 100, function(v)
+        sApi:Colorpicker("Accent Color", Theme.Accent, function(c) setAccent(c) end, "_accent")
+        sApi:Slider("UI Scale", "Resize the whole interface", 50, 150, 100, function(v)
             userScale = v / 100
             applyScale()
         end, "_uiscale", { Suffix = " %" })
-        sApi:Bind("Toggle Key", ToggleKey, function() toggleUI() end, "_togglekey")
+        sApi:Bind("Toggle UI Key", ToggleKey, function() toggleUI() end, "_togglekey")
 
         sApi:Section("Theme Presets")
         for name, _ in pairs(PresetThemes) do
-            sApi:Button(name, "Appliquer le thème " .. name, function()
+            sApi:Button(name, "Apply the " .. name .. " theme", function()
                 applyTheme(name)
-                -- Recolorer les éléments déjà existants ? Ici on ne recolore pas dynamiquement les panels déjà créés.
-                -- On peut avertir que le changement prend effet après redémarrage, ou forcer une mise à jour.
-                Window:Notify("Thème", "Thème " .. name .. " appliqué (redémarrez pour tout voir)")
+                Window:Notify("Theme", name .. " theme applied. Restart UI to see all changes.")
             end)
         end
 
@@ -1948,11 +1949,6 @@ function _Catalyst:Window(opt)
 
     function Window:SetTheme(theme)
         applyTheme(theme)
-        -- Forcer la mise à jour des couleurs de fond des éléments existants
-        -- Ici on pourrait parcourir les descendants de MainFrame et réaffecter les BackgroundColor3 selon le thème,
-        -- mais c'est complexe car certains éléments ont des couleurs fixes. On conseille de redémarrer l'UI.
-        -- On va quand même mettre à jour les éléments marqués (AccentObjects déjà fait via setAccent).
-        -- Pour les autres couleurs (Panel, Element...), on laisse l'utilisateur recréer la fenêtre si besoin.
     end
 
     local didInit = false

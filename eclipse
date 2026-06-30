@@ -1,5 +1,5 @@
 local _Catalyst = {}
-_Catalyst.Version = "GX 2.2"
+_Catalyst.Version = "GX 2.2 (Static)"
 _Catalyst.RainbowColorValue = 0
 _Catalyst.HueSelectionPosition = 0
 _Catalyst.Flags = {}
@@ -1280,6 +1280,8 @@ function _Catalyst:Window(opt)
         sub.Parent = contentPanel.header
     end
 
+    -- Static layout: Tabs left, Content center, Settings right.
+    -- No drag or re-dock allowed.
     local panels = {
         Tabs     = { panel = tabsPanel,     edge = "Left",  order = 1 },
         Settings = { panel = settingsPanel, edge = "Right", order = 1 },
@@ -1336,188 +1338,22 @@ function _Catalyst:Window(opt)
 
     local function relayout(animated)
         local rect = { x = PAD, y = PAD, w = WIN_W - 2 * PAD, h = WIN_H - 2 * PAD }
-        local byEdge = { Left = {}, Right = {}, Top = {}, Bottom = {} }
-        for _, p in pairs(panels) do table.insert(byEdge[p.edge], p) end
-        for _, arr in pairs(byEdge) do
-            table.sort(arr, function(a, b) return a.order < b.order end)
-        end
-        if #byEdge.Left > 0 then
-            local arr = byEdge.Left
-            local each = (rect.h - GAP * (#arr - 1)) / #arr
-            local cy = rect.y
-            for _, pp in ipairs(arr) do
-                placeFrame(pp.panel.frame, rect.x, cy, SIDE_W, each, animated)
-                cy = cy + each + GAP
-            end
-            rect.x = rect.x + SIDE_W + GAP
-            rect.w = rect.w - SIDE_W - GAP
-        end
-        if #byEdge.Right > 0 then
-            local arr = byEdge.Right
-            local each = (rect.h - GAP * (#arr - 1)) / #arr
-            local cy = rect.y
-            for _, pp in ipairs(arr) do
-                placeFrame(pp.panel.frame, rect.x + rect.w - SIDE_W, cy, SIDE_W, each, animated)
-                cy = cy + each + GAP
-            end
-            rect.w = rect.w - SIDE_W - GAP
-        end
-        if #byEdge.Top > 0 then
-            local arr = byEdge.Top
-            local each = (rect.w - GAP * (#arr - 1)) / #arr
-            local cx = rect.x
-            for _, pp in ipairs(arr) do
-                placeFrame(pp.panel.frame, cx, rect.y, each, SIDE_H, animated)
-                cx = cx + each + GAP
-            end
-            rect.y = rect.y + SIDE_H + GAP
-            rect.h = rect.h - SIDE_H - GAP
-        end
-        if #byEdge.Bottom > 0 then
-            local arr = byEdge.Bottom
-            local each = (rect.w - GAP * (#arr - 1)) / #arr
-            local cx = rect.x
-            for _, pp in ipairs(arr) do
-                placeFrame(pp.panel.frame, cx, rect.y + rect.h - SIDE_H, each, SIDE_H, animated)
-                cx = cx + each + GAP
-            end
-            rect.h = rect.h - SIDE_H - GAP
-        end
+        -- Tabs always on left
+        placeFrame(tabsPanel.frame, rect.x, rect.y, SIDE_W, rect.h, animated)
+        rect.x = rect.x + SIDE_W + GAP
+        rect.w = rect.w - SIDE_W - GAP
+
+        -- Settings always on right
+        placeFrame(settingsPanel.frame, rect.x + rect.w - SIDE_W, rect.y, SIDE_W, rect.h, animated)
+        rect.w = rect.w - SIDE_W - GAP
+
+        -- Content in the middle
         placeFrame(contentPanel.frame, rect.x, rect.y, rect.w, rect.h, animated)
         refreshTabList()
     end
 
-    local function makeZone()
-        local z = Instance.new("Frame")
-        z.BackgroundTransparency = 0.55
-        z.BorderSizePixel = 0
-        z.Visible = false
-        z.ZIndex = 30
-        z.Parent = MainFrame
-        corner(z, 8)
-        regAccent(z, "BackgroundColor3")
-        local s = stroke(z, Theme.Accent, 2, 0.1)
-        regAccent(s, "Color")
-        local lbl = Instance.new("TextLabel")
-        lbl.BackgroundTransparency = 1
-        lbl.Size = UDim2.new(1, 0, 1, 0)
-        lbl.Font = Enum.Font.GothamBold
-        lbl.Text = "DOCK HERE"
-        lbl.TextColor3 = Theme.Text
-        lbl.TextSize = 14
-        lbl.ZIndex = 31
-        lbl.Parent = z
-        return z
-    end
-    local zones = { Left = makeZone(), Right = makeZone(), Top = makeZone(), Bottom = makeZone() }
-    do
-        zones.Left.Position   = UDim2.fromOffset(PAD, PAD)
-        zones.Left.Size       = UDim2.fromOffset(SIDE_W, WIN_H - 2 * PAD)
-        zones.Right.Position  = UDim2.fromOffset(WIN_W - PAD - SIDE_W, PAD)
-        zones.Right.Size      = UDim2.fromOffset(SIDE_W, WIN_H - 2 * PAD)
-        zones.Top.Position    = UDim2.fromOffset(PAD, PAD)
-        zones.Top.Size        = UDim2.fromOffset(WIN_W - 2 * PAD, SIDE_H)
-        zones.Bottom.Position = UDim2.fromOffset(PAD, WIN_H - PAD - SIDE_H)
-        zones.Bottom.Size     = UDim2.fromOffset(WIN_W - 2 * PAD, SIDE_H)
-    end
-    local function hideZones()
-        for _, z in pairs(zones) do z.Visible = false end
-    end
-    local function showOnlyZone(edge)
-        for e, z in pairs(zones) do z.Visible = (e == edge) end
-    end
-
-    local function nearestEdge(cursor)
-        local mp, ms = MainFrame.AbsolutePosition, MainFrame.AbsoluteSize
-        local rx = math.clamp((cursor.X - mp.X) / math.max(ms.X, 1), 0, 1)
-        local ry = math.clamp((cursor.Y - mp.Y) / math.max(ms.Y, 1), 0, 1)
-        local d = { Left = rx, Right = 1 - rx, Top = ry, Bottom = 1 - ry }
-        local best, bestV = "Left", math.huge
-        for e, vv in pairs(d) do
-            if vv < bestV then best, bestV = e, vv end
-        end
-        local axisVal = (best == "Left" or best == "Right") and ry or rx
-        return best, axisVal
-    end
-
-    do
-        local dragging, startInput, startPos = false, nil, nil
-        contentPanel.header.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-            or i.UserInputType == Enum.UserInputType.Touch then
-                dragging, startInput, startPos = true, i.Position, MainFrame.Position
-            end
-        end)
-        contentPanel.header.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-            or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if not alive() then return end
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-            or i.UserInputType == Enum.UserInputType.Touch) then
-                local delta = i.Position - startInput
-                MainFrame.Position = UDim2.new(
-                    startPos.X.Scale, snap(startPos.X.Offset + delta.X),
-                    startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
-                )
-            end
-        end)
-    end
-
-    local function makePanelDrag(key)
-        local pData = panels[key]
-        local handle = pData.panel.header
-        local dragging, startInput, startPos = false, nil, nil
-        local lastCursor = Vector2.new()
-
-        handle.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-            or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                startInput = i.Position
-                startPos = pData.panel.frame.Position
-                pData.panel.frame.ZIndex = 20
-            end
-        end)
-        handle.InputEnded:Connect(function(i)
-            if not dragging then return end
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-            or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-                pData.panel.frame.ZIndex = 1
-                hideZones()
-                local edge, axisVal = nearestEdge(lastCursor)
-                local other
-                for k, v in pairs(panels) do if k ~= key then other = v end end
-                pData.edge = edge
-                if other and other.edge == edge then
-                    if axisVal < 0.5 then pData.order, other.order = 1, 2
-                    else pData.order, other.order = 2, 1 end
-                else
-                    pData.order = 1
-                end
-                relayout(true)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if not alive() then return end
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-            or i.UserInputType == Enum.UserInputType.Touch) then
-                lastCursor = Vector2.new(i.Position.X, i.Position.Y)
-                local delta = i.Position - startInput
-                pData.panel.frame.Position = UDim2.new(
-                    0, snap(startPos.X.Offset + delta.X),
-                    0, snap(startPos.Y.Offset + delta.Y)
-                )
-                showOnlyZone(nearestEdge(lastCursor))
-            end
-        end)
-    end
-    makePanelDrag("Tabs")
-    makePanelDrag("Settings")
+    -- Remove all drag, drop zones, and nearestEdge logic (window is static)
+    -- No panel dragging: the headers are just static labels now.
 
     local firstTab = true
     function Window:Tab(name, icon)
@@ -1840,31 +1676,11 @@ function _Catalyst:Window(opt)
         ring.Parent = fab
         regAccent(ring, "Color")
 
-        local dragging, moved, startInput, startPos = false, false, nil, nil
+        -- Mobile FAB is now static; only toggles the UI on click.
         fab.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1
             or i.UserInputType == Enum.UserInputType.Touch then
-                dragging, moved = true, false
-                startInput, startPos = i.Position, fab.Position
-            end
-        end)
-        fab.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-            or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-                if not moved then toggleUI() end
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if not alive() then return end
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-            or i.UserInputType == Enum.UserInputType.Touch) then
-                local delta = i.Position - startInput
-                if delta.Magnitude > 6 then moved = true end
-                fab.Position = UDim2.new(
-                    startPos.X.Scale, startPos.X.Offset + delta.X,
-                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                )
+                toggleUI()
             end
         end)
     end

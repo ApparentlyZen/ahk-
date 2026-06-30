@@ -1,3 +1,4 @@
+-- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -61,6 +62,18 @@ local function setAccent(c)
     end
     for _, fn in ipairs(AccentListeners) do
         pcall(fn, c)
+    end
+end
+
+local function applyTheme(customTheme)
+    if not customTheme then return end
+    for k, v in pairs(customTheme) do
+        if Theme[k] and typeof(v) == "Color3" then
+            Theme[k] = v
+            if k == "Accent" then
+                setAccent(v)  -- déclenche les listeners
+            end
+        end
     end
 end
 
@@ -1143,8 +1156,14 @@ function _Catalyst:Window(opt)
     local SubTitle     = opt.SubTitle or opt.Sub or "GX Edition"
     local ConfigFolder = opt.ConfigFolder or "_CatalystConfigs"
     local ToggleKey    = opt.ToggleKey or opt.CloseBind or Enum.KeyCode.RightAlt
+
+    -- Appliquer le thème personnalisé avant toute création d'UI
+    applyTheme(opt.Theme)
     if opt.Accent then setAccent(opt.Accent) end
+
     FileSystem.makeFolder(ConfigFolder)
+
+    local HideSettings = opt.HideSettings == true
 
     local WIN_W, WIN_H = 880, 540
     local PAD, GAP     = 12, 10
@@ -1156,100 +1175,109 @@ function _Catalyst:Window(opt)
     local Window = {}
 
     -- =========================================================
-    -- SPLASH SCREEN (image nette, sans flou)
+    -- SPLASH SCREEN (personnalisable)
     -- =========================================================
-    local splashScreen = Instance.new("Frame")
-    splashScreen.Size = UDim2.new(1, 0, 1, 0)
-    splashScreen.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    splashScreen.BorderSizePixel = 0
-    splashScreen.ZIndex = 100
-    splashScreen.Parent = ScreenGui
+    local splashOpt = opt.Splash
+    if splashOpt ~= false then
+        splashOpt = splashOpt or {}
+        local splashImageUrl = splashOpt.ImageUrl or "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
+        local splashDuration = splashOpt.Duration or 2.5
+        local splashBgColor = splashOpt.BackgroundColor or Color3.fromRGB(0, 0, 0)
+        local splashTitleColor = splashOpt.TitleColor or Theme.Accent
+        local splashSubColor = splashOpt.SubColor or Theme.Text
+        local splashLineColor = splashOpt.AccentLineColor or Theme.Accent
 
-    local splashImage = Instance.new("ImageLabel")
-    splashImage.Size = UDim2.new(1, 0, 1, 0)
-    splashImage.BackgroundTransparency = 1
-    splashImage.ImageTransparency = 0.15  -- très léger voile, image nette
-    splashImage.ScaleType = Enum.ScaleType.Fit  -- préserve le ratio, pas de crop flou
-    splashImage.ZIndex = 101
-    splashImage.Parent = splashScreen
+        local splashScreen = Instance.new("Frame")
+        splashScreen.Size = UDim2.new(1, 0, 1, 0)
+        splashScreen.BackgroundColor3 = splashBgColor
+        splashScreen.BorderSizePixel = 0
+        splashScreen.ZIndex = 100
+        splashScreen.Parent = ScreenGui
 
-    -- Couche de fond semi-transparente pour lisibilité du texte
-    local overlay = Instance.new("Frame")
-    overlay.Size = UDim2.new(1, 0, 1, 0)
-    overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    overlay.BackgroundTransparency = 0.3
-    overlay.BorderSizePixel = 0
-    overlay.ZIndex = 101
-    overlay.Parent = splashScreen
+        local splashImage = Instance.new("ImageLabel")
+        splashImage.Size = UDim2.new(1, 0, 1, 0)
+        splashImage.BackgroundTransparency = 1
+        splashImage.ImageTransparency = 0.15
+        splashImage.ScaleType = Enum.ScaleType.Fit
+        splashImage.ZIndex = 101
+        splashImage.Parent = splashScreen
 
-    local splashTitle = Instance.new("TextLabel")
-    splashTitle.Size = UDim2.new(0, 400, 0, 50)
-    splashTitle.Position = UDim2.new(0.5, -200, 0.4, -25)
-    splashTitle.BackgroundTransparency = 1
-    splashTitle.Text = Title
-    splashTitle.Font = Enum.Font.GothamBlack
-    splashTitle.TextSize = 32
-    splashTitle.TextColor3 = Theme.Accent
-    splashTitle.TextTransparency = 1
-    splashTitle.ZIndex = 102
-    splashTitle.Parent = splashScreen
+        local overlay = Instance.new("Frame")
+        overlay.Size = UDim2.new(1, 0, 1, 0)
+        overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        overlay.BackgroundTransparency = 0.3
+        overlay.BorderSizePixel = 0
+        overlay.ZIndex = 101
+        overlay.Parent = splashScreen
 
-    local splashSub = Instance.new("TextLabel")
-    splashSub.Size = UDim2.new(0, 400, 0, 30)
-    splashSub.Position = UDim2.new(0.5, -200, 0.5, -15)
-    splashSub.BackgroundTransparency = 1
-    splashSub.Text = SubTitle
-    splashSub.Font = Enum.Font.GothamMedium
-    splashSub.TextSize = 16
-    splashSub.TextColor3 = Theme.Text
-    splashSub.TextTransparency = 1
-    splashSub.ZIndex = 102
-    splashSub.Parent = splashScreen
+        local splashTitle = Instance.new("TextLabel")
+        splashTitle.Size = UDim2.new(0, 400, 0, 50)
+        splashTitle.Position = UDim2.new(0.5, -200, 0.4, -25)
+        splashTitle.BackgroundTransparency = 1
+        splashTitle.Text = Title
+        splashTitle.Font = Enum.Font.GothamBlack
+        splashTitle.TextSize = 32
+        splashTitle.TextColor3 = splashTitleColor
+        splashTitle.TextTransparency = 1
+        splashTitle.ZIndex = 102
+        splashTitle.Parent = splashScreen
 
-    local splashAccentLine = Instance.new("Frame")
-    splashAccentLine.Size = UDim2.new(0, 0, 0, 2)
-    splashAccentLine.Position = UDim2.new(0.5, 0, 0.55, 0)
-    splashAccentLine.AnchorPoint = Vector2.new(0.5, 0)
-    splashAccentLine.BackgroundColor3 = Theme.Accent
-    splashAccentLine.BorderSizePixel = 0
-    splashAccentLine.ZIndex = 102
-    splashAccentLine.Parent = splashScreen
+        local splashSub = Instance.new("TextLabel")
+        splashSub.Size = UDim2.new(0, 400, 0, 30)
+        splashSub.Position = UDim2.new(0.5, -200, 0.5, -15)
+        splashSub.BackgroundTransparency = 1
+        splashSub.Text = SubTitle
+        splashSub.Font = Enum.Font.GothamMedium
+        splashSub.TextSize = 16
+        splashSub.TextColor3 = splashSubColor
+        splashSub.TextTransparency = 1
+        splashSub.ZIndex = 102
+        splashSub.Parent = splashScreen
 
-    -- Chargement de l'image (méthode compatible)
-    local logoUrl = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
-    taskLib.spawn(function()
-        pcall(function()
-            if writefile and getcustomasset and game.HttpGet then
-                if not isfile("catalyst_splash.webp") then
-                    writefile("catalyst_splash.webp", game:HttpGet(logoUrl))
+        local splashAccentLine = Instance.new("Frame")
+        splashAccentLine.Size = UDim2.new(0, 0, 0, 2)
+        splashAccentLine.Position = UDim2.new(0.5, 0, 0.55, 0)
+        splashAccentLine.AnchorPoint = Vector2.new(0.5, 0)
+        splashAccentLine.BackgroundColor3 = splashLineColor
+        splashAccentLine.BorderSizePixel = 0
+        splashAccentLine.ZIndex = 102
+        splashAccentLine.Parent = splashScreen
+
+        -- Chargement de l'image
+        taskLib.spawn(function()
+            pcall(function()
+                if writefile and getcustomasset and game.HttpGet then
+                    if not isfile("catalyst_splash.webp") then
+                        writefile("catalyst_splash.webp", game:HttpGet(splashImageUrl))
+                    end
+                    splashImage.Image = getcustomasset("catalyst_splash.webp")
+                else
+                    splashImage.Image = splashImageUrl
                 end
-                splashImage.Image = getcustomasset("catalyst_splash.webp")
-            else
-                splashImage.Image = logoUrl
-            end
+            end)
         end)
-    end)
 
-    -- Animation
-    taskLib.spawn(function()
-        taskLib.wait(0.2)
-        tween(splashImage, 1.2, { ImageTransparency = 0.05 })  -- plus opaque
-        tween(splashTitle, 0.8, { TextTransparency = 0 })
-        tween(splashSub, 0.8, { TextTransparency = 0.6 })
-        tween(splashAccentLine, 1.0, { Size = UDim2.new(0, 250, 0, 2) })
+        -- Animation
+        taskLib.spawn(function()
+            taskLib.wait(0.2)
+            tween(splashImage, 1.2, { ImageTransparency = 0.05 })
+            tween(splashTitle, 0.8, { TextTransparency = 0 })
+            tween(splashSub, 0.8, { TextTransparency = 0.6 })
+            tween(splashAccentLine, 1.0, { Size = UDim2.new(0, 250, 0, 2) })
 
-        taskLib.wait(2.5)
-        -- Disparition
-        tween(splashScreen, 0.8, { BackgroundTransparency = 1 })
-        tween(splashImage, 0.8, { ImageTransparency = 1 })
-        tween(overlay, 0.8, { BackgroundTransparency = 1 })
-        tween(splashTitle, 0.5, { TextTransparency = 1 })
-        tween(splashSub, 0.5, { TextTransparency = 1 })
-        tween(splashAccentLine, 0.5, { BackgroundTransparency = 1 })
+            taskLib.wait(splashDuration)
+            -- Disparition
+            tween(splashScreen, 0.8, { BackgroundTransparency = 1 })
+            tween(splashImage, 0.8, { ImageTransparency = 1 })
+            tween(overlay, 0.8, { BackgroundTransparency = 1 })
+            tween(splashTitle, 0.5, { TextTransparency = 1 })
+            tween(splashSub, 0.5, { TextTransparency = 1 })
+            tween(splashAccentLine, 0.5, { BackgroundTransparency = 1 })
 
-        taskLib.wait(1.0)
-        splashScreen:Destroy()
-    end)
+            taskLib.wait(1.0)
+            splashScreen:Destroy()
+        end)
+    end
 
     -- =========================================================
     -- INTERFACE PRINCIPALE
@@ -1361,8 +1389,8 @@ function _Catalyst:Window(opt)
 
     local tabsPanel     = makePanel("MENU")
     local contentPanel  = makePanel(Title)
-    local settingsPanel = makePanel("SETTINGS")
 
+    -- Sous-titre dans le contentPanel
     do
         contentPanel.title.Size = UDim2.new(1, -44, 0, 18)
         contentPanel.title.Position = UDim2.new(0, 28, 0, 4)
@@ -1379,10 +1407,18 @@ function _Catalyst:Window(opt)
         sub.Parent = contentPanel.header
     end
 
+    -- Settings panel (optionnel)
+    local settingsPanel = nil
+    if not HideSettings then
+        settingsPanel = makePanel("SETTINGS")
+    end
+
     local panels = {
         Tabs     = { panel = tabsPanel,     edge = "Left",  order = 1 },
-        Settings = { panel = settingsPanel, edge = "Right", order = 1 },
     }
+    if settingsPanel then
+        panels.Settings = { panel = settingsPanel, edge = "Right", order = 1 }
+    end
 
     local tabScroll = Instance.new("ScrollingFrame")
     tabScroll.Size = UDim2.new(1, 0, 1, 0)
@@ -1440,9 +1476,11 @@ function _Catalyst:Window(opt)
         rect.x = rect.x + SIDE_W + GAP
         rect.w = rect.w - SIDE_W - GAP
 
-        -- Settings right
-        placeFrame(settingsPanel.frame, rect.x + rect.w - SIDE_W, rect.y, SIDE_W, rect.h, animated)
-        rect.w = rect.w - SIDE_W - GAP
+        -- Settings right (if present)
+        if settingsPanel then
+            placeFrame(settingsPanel.frame, rect.x + rect.w - SIDE_W, rect.y, SIDE_W, rect.h, animated)
+            rect.w = rect.w - SIDE_W - GAP
+        end
 
         -- Content center
         placeFrame(contentPanel.frame, rect.x, rect.y, rect.w, rect.h, animated)
@@ -1707,83 +1745,84 @@ function _Catalyst:Window(opt)
         end
     end
 
-    local settingsScroll = Instance.new("ScrollingFrame")
-    settingsScroll.Size = UDim2.new(1, 0, 1, 0)
-    settingsScroll.BackgroundTransparency = 1
-    settingsScroll.BorderSizePixel = 0
-    settingsScroll.ScrollBarThickness = 4
-    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    settingsScroll.Parent = settingsPanel.body
-    regAccent(settingsScroll, "ScrollBarImageColor3")
-    local sApi = makeAPI(settingsScroll)
+    -- Settings content (only if panel exists)
+    if settingsPanel then
+        local settingsScroll = Instance.new("ScrollingFrame")
+        settingsScroll.Size = UDim2.new(1, 0, 1, 0)
+        settingsScroll.BackgroundTransparency = 1
+        settingsScroll.BorderSizePixel = 0
+        settingsScroll.ScrollBarThickness = 4
+        settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        settingsScroll.Parent = settingsPanel.body
+        regAccent(settingsScroll, "ScrollBarImageColor3")
+        local sApi = makeAPI(settingsScroll)
 
-    local currentName = ""
-    local cfgDrop
+        local currentName = ""
+        local cfgDrop
 
-    sApi:Section("Configuration")
-    local nameBox = sApi:Textbox("Config Name", "", false, function(t) currentName = t end)
-    cfgDrop = sApi:Dropdown("Saved Configs", getConfigList(), function(v)
-        currentName = v
-        nameBox.Set(v)
-    end)
-    sApi:Button("Save Config", "Write current settings to a file", function()
-        if currentName == "" then
-            Window:Notify("Config", "Type a config name first.")
-            return
-        end
-        local ok = Window:SaveConfig(currentName)
-        cfgDrop.Refresh(getConfigList())
-        Window:Notify("Config", ok and ("Saved '" .. currentName .. "'") or "Save failed.")
-    end)
-    sApi:Button("Load Config", "Apply settings from the selected file", function()
-        if currentName == "" then
-            Window:Notify("Config", "Select or type a config name first.")
-            return
-        end
-        local ok = Window:LoadConfig(currentName)
-        Window:Notify("Config", ok and ("Loaded '" .. currentName .. "'") or "Load failed.")
-    end)
-    sApi:Button("Delete Config", "Remove the selected config file", function()
-        if currentName == "" then return end
-        Window:DeleteConfig(currentName)
-        cfgDrop.Refresh(getConfigList())
-        Window:Notify("Config", "Deleted '" .. currentName .. "'")
-    end)
-    sApi:Button("Refresh List", "Re-scan the config folder", function()
-        cfgDrop.Refresh(getConfigList())
-        Window:Notify("Config", "Config list refreshed.")
-    end)
-
-    local meta0 = readMeta()
-    sApi:Toggle("Auto-load Recent", "Load the last used config on launch",
-        meta0.autoload ~= false, function(on)
-            writeMeta({ autoload = on })
+        sApi:Section("Configuration")
+        local nameBox = sApi:Textbox("Config Name", "", false, function(t) currentName = t end)
+        cfgDrop = sApi:Dropdown("Saved Configs", getConfigList(), function(v)
+            currentName = v
+            nameBox.Set(v)
         end)
-    sApi:Button("Reset to Defaults", "Restore every option to default values", function()
-        Window:ResetDefaults()
-        Window:Notify("Config", "All settings reset to defaults.")
-    end)
+        sApi:Button("Save Config", "Write current settings to a file", function()
+            if currentName == "" then
+                Window:Notify("Config", "Type a config name first.")
+                return
+            end
+            local ok = Window:SaveConfig(currentName)
+            cfgDrop.Refresh(getConfigList())
+            Window:Notify("Config", ok and ("Saved '" .. currentName .. "'") or "Save failed.")
+        end)
+        sApi:Button("Load Config", "Apply settings from the selected file", function()
+            if currentName == "" then
+                Window:Notify("Config", "Select or type a config name first.")
+                return
+            end
+            local ok = Window:LoadConfig(currentName)
+            Window:Notify("Config", ok and ("Loaded '" .. currentName .. "'") or "Load failed.")
+        end)
+        sApi:Button("Delete Config", "Remove the selected config file", function()
+            if currentName == "" then return end
+            Window:DeleteConfig(currentName)
+            cfgDrop.Refresh(getConfigList())
+            Window:Notify("Config", "Deleted '" .. currentName .. "'")
+        end)
+        sApi:Button("Refresh List", "Re-scan the config folder", function()
+            cfgDrop.Refresh(getConfigList())
+            Window:Notify("Config", "Config list refreshed.")
+        end)
 
-    sApi:Section("Appearance")
-    sApi:Colorpicker("Accent Color", Theme.Accent, function(c)
-        setAccent(c)
-    end, "_accent")
-    sApi:Slider("UI Scale", "Resize the whole interface", 50, 150, 100, function(v)
-        userScale = v / 100
-        applyScale()
-    end, "_uiscale", { Suffix = " %" })
-    sApi:Bind("Toggle UI Key", ToggleKey, function()
-        toggleUI()
-    end, "_togglekey")
+        local meta0 = readMeta()
+        sApi:Toggle("Auto-load Recent", "Load the last used config on launch",
+            meta0.autoload ~= false, function(on)
+                writeMeta({ autoload = on })
+            end)
+        sApi:Button("Reset to Defaults", "Restore every option to default values", function()
+            Window:ResetDefaults()
+            Window:Notify("Config", "All settings reset to defaults.")
+        end)
 
-    sApi:Section("About")
-    sApi:Label("_Catalyst " .. _Catalyst.Version)
-    sApi:Label(FileSystem.hasIO and "File system: available" or "File system: in-memory only")
-    sApi:Label(IS_MOBILE and "Mode: mobile / touch" or "Mode: desktop")
+        sApi:Section("Appearance")
+        sApi:Colorpicker("Accent Color", Theme.Accent, function(c)
+            setAccent(c)
+        end, "_accent")
+        sApi:Slider("UI Scale", "Resize the whole interface", 50, 150, 100, function(v)
+            userScale = v / 100
+            applyScale()
+        end, "_uiscale", { Suffix = " %" })
+        sApi:Bind("Toggle UI Key", ToggleKey, function()
+            toggleUI()
+        end, "_togglekey")
 
-    -- =========================================================
-    -- BOUTON MOBILE (FAB) avec chargement dynamique depuis GitHub
-    -- =========================================================
+        sApi:Section("About")
+        sApi:Label("_Catalyst " .. _Catalyst.Version)
+        sApi:Label(FileSystem.hasIO and "File system: available" or "File system: in-memory only")
+        sApi:Label(IS_MOBILE and "Mode: mobile / touch" or "Mode: desktop")
+    end
+
+    -- Bouton mobile (FAB) avec chargement dynamique
     if IS_MOBILE then
         local fab = Instance.new("ImageButton")
         fab.Size = UDim2.new(0, 48, 0, 48)
@@ -1799,8 +1838,7 @@ function _Catalyst:Window(opt)
         ring.Parent = fab
         regAccent(ring, "Color")
 
-        -- Chargement de l'image (même méthode que le splash)
-        local fabUrl = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
+        local fabUrl = opt.FabImageUrl or "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
         taskLib.spawn(function()
             pcall(function()
                 if writefile and getcustomasset and game.HttpGet then
@@ -1809,7 +1847,6 @@ function _Catalyst:Window(opt)
                     end
                     fab.Image = getcustomasset("catalyst_fab.webp")
                 else
-                    -- fallback : ID Roblox (au cas où)
                     fab.Image = "rbxassetid://122765407222246"
                 end
             end)
@@ -1827,14 +1864,17 @@ function _Catalyst:Window(opt)
     function Window:Init()
         if didInit then return end
         didInit = true
-        cfgDrop.Refresh(getConfigList())
-        local meta = readMeta()
-        if meta.autoload ~= false and meta.recent then
-            local ok = Window:LoadConfig(meta.recent)
-            if ok then
-                currentName = meta.recent
-                nameBox.Set(meta.recent)
-                Window:Notify("Config", "Auto-loaded '" .. meta.recent .. "'")
+        if settingsPanel then
+            -- refresh config list only if settings exist
+            cfgDrop.Refresh(getConfigList())
+            local meta = readMeta()
+            if meta.autoload ~= false and meta.recent then
+                local ok = Window:LoadConfig(meta.recent)
+                if ok then
+                    currentName = meta.recent
+                    nameBox.Set(meta.recent)
+                    Window:Notify("Config", "Auto-loaded '" .. meta.recent .. "'")
+                end
             end
         end
     end

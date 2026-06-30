@@ -1,4 +1,3 @@
--- _Catalyst GX 2.2 (Draggable, No Dock)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -1351,7 +1350,7 @@ function _Catalyst:Window(opt)
         refreshTabList()
     end
 
-    -- Window dragging (keep)
+    -- Window dragging
     do
         local dragging, startInput, startPos = false, nil, nil
         contentPanel.header.InputBegan:Connect(function(i)
@@ -1378,8 +1377,6 @@ function _Catalyst:Window(opt)
             end
         end)
     end
-
-    -- No panel dragging (removed zones, nearestEdge, makePanelDrag)
 
     local firstTab = true
     function Window:Tab(name, icon)
@@ -1686,15 +1683,17 @@ function _Catalyst:Window(opt)
     sApi:Label(IS_MOBILE and "Mode: mobile / touch" or "Mode: desktop")
 
     if IS_MOBILE then
-        local fab = Instance.new("TextButton")
+        local FAB_IMAGE_ID = "rbxassetid://122765407222246" -- Ton icône personnalisée
+
+        local fab = Instance.new("ImageButton")
         fab.Size = UDim2.new(0, 48, 0, 48)
         fab.Position = UDim2.new(0, 16, 0.5, -24)
         fab.BackgroundColor3 = Theme.Panel
         fab.AutoButtonColor = false
-        fab.Text = "CX"
-        fab.Font = Enum.Font.GothamBold
-        fab.TextColor3 = Theme.Text
-        fab.TextSize = 16
+        fab.Image = FAB_IMAGE_ID
+        fab.ImageColor3 = Color3.fromRGB(255, 255, 255)
+        fab.ScaleType = Enum.ScaleType.Fit
+        fab.BackgroundTransparency = 0
         fab.Parent = ScreenGui
         corner(fab, 24)
         local ring = Instance.new("UIStroke")
@@ -1702,7 +1701,6 @@ function _Catalyst:Window(opt)
         ring.Parent = fab
         regAccent(ring, "Color")
 
-        -- Static FAB toggles UI
         fab.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1
             or i.UserInputType == Enum.UserInputType.Touch then

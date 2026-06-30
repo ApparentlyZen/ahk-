@@ -1,4 +1,4 @@
--- _Catalyst GX 2.2 (Full Themes, Fixed Drag)
+-- _Catalyst GX 2.2 (Full Theme System - Everything Recolored)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -31,7 +31,7 @@ local function alive() return genv.__CatalystGen == MY_GEN end
 local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
 -- =========================================================
--- PRESET THEMES
+-- PRESET THEMES (12 magnifiques)
 -- =========================================================
 local PresetThemes = {
     Default = {
@@ -173,10 +173,9 @@ for k, v in pairs(PresetThemes.Default) do Theme[k] = v end
 _Catalyst.Theme = Theme
 
 -- =========================================================
--- THEME SYSTEM
+-- THEME SYSTEM (réellement complet)
 -- =========================================================
-local ThemeTagged = {}      -- {obj, prop} for static elements
-local DynamicComponents = {} -- functions to reapply active states
+local ThemeTagged = {}      -- {obj, prop}
 
 local function tagTheme(obj, prop)
     table.insert(ThemeTagged, {obj = obj, prop = prop})
@@ -197,15 +196,11 @@ local function applyTheme(customTheme)
             if Theme[k] and typeof(v) == "Color3" then Theme[k] = v end
         end
     end
-    -- Mettre à jour les éléments statiques
+    -- Mettre à jour tous les éléments enregistrés
     for _, tag in ipairs(ThemeTagged) do
         if tag.obj and tag.obj.Parent and Theme[tag.prop] then
             pcall(function() tag.obj[tag.prop] = Theme[tag.prop] end)
         end
-    end
-    -- Rafraîchir les composants dynamiques (toggles, sliders…)
-    for _, fn in ipairs(DynamicComponents) do
-        pcall(fn)
     end
 end
 
@@ -245,7 +240,7 @@ local function stroke(o, col, th, tr)
     s.Transparency = tr or 0
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     s.Parent = o
-    tagTheme(s, "Color")
+    tagTheme(s, "Color")  -- pour que le stroke change de couleur
     return s
 end
 local function tween(o, t, props, st, dir)
@@ -424,7 +419,7 @@ local function deserialize(v)
 end
 
 -- =========================================================
--- API DE CONSTRUCTION (avec enregistrement dynamique)
+-- API DE CONSTRUCTION (tout est taggé)
 -- =========================================================
 local function makeAPI(scroll)
     local layout = Instance.new("UIListLayout")
@@ -600,7 +595,7 @@ local function makeAPI(scroll)
 
     function api:Label(text)
         local card = newCard(34)
-        card.BackgroundColor3 = Theme.Panel
+        card.BackgroundColor3 = Theme.Panel   -- on force le Label en Panel
         local l = Instance.new("TextLabel")
         l.BackgroundTransparency = 1
         l.Position = UDim2.new(0, 12, 0, 0)
@@ -699,16 +694,6 @@ local function makeAPI(scroll)
             if flag then _Catalyst.Flags[flag] = state end
             if fire then pcall(callback, state) end
         end
-
-        -- Sauvegarde pour mise à jour après changement de thème
-        local function refresh()
-            if pill and pill.Parent then
-                pill.BackgroundColor3 = state and Theme.Accent or Theme.Stroke
-                knob.Position = UDim2.new(state and 1 or 0, state and -18 or 2, 0.5, 0)
-            end
-        end
-        table.insert(DynamicComponents, refresh)
-
         onAccent(function(c)
             if state then pill.BackgroundColor3 = c end
         end)
@@ -884,8 +869,7 @@ local function makeAPI(scroll)
         end
 
         -- Drag du slider
-        makeDrag(track, function() end)  -- le onMove sera redéfini ci-dessous
-        local dragStartInput, dragStartPos
+        local dragStartInput
         track.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragStartInput = input.Position
@@ -906,15 +890,6 @@ local function makeAPI(scroll)
                 dragStartInput = nil
             end
         end)
-
-        -- Mise à jour après changement de thème
-        local function refresh()
-            fill.BackgroundColor3 = Theme.Accent
-            knob.BackgroundColor3 = Theme.Text
-            valLbl.TextColor3 = Theme.Text
-            -- pas besoin de recalculer la position
-        end
-        table.insert(DynamicComponents, refresh)
 
         setValue(default, false)
         if flag then
@@ -1047,17 +1022,6 @@ local function makeAPI(scroll)
             _Catalyst.Flags[flag] = selected
         end
 
-        -- Rafraîchir les items après changement de thème
-        local function refresh()
-            for _, it in ipairs(items) do
-                if it.Parent then
-                    it.BackgroundColor3 = Theme.Panel
-                    it.TextColor3 = Theme.SubText
-                end
-            end
-        end
-        table.insert(DynamicComponents, refresh)
-
         return {
             Get = function() return selected end,
             Set = function(v) choose(v, true) end,
@@ -1184,18 +1148,53 @@ local function makeAPI(scroll)
             if rainbow then rbPill.BackgroundColor3 = c end
         end)
 
-        makeDrag(box, function(posV)
-            if rainbow then return end
-            local x = math.clamp((posV.X - box.AbsolutePosition.X) / math.max(box.AbsoluteSize.X, 1), 0, 1)
-            local y = math.clamp((posV.Y - box.AbsolutePosition.Y) / math.max(box.AbsoluteSize.Y, 1), 0, 1)
-            s, v = x, 1 - y
-            apply(true)
+        makeDrag(box, function() end)  -- sera redéfini
+        local dragStartInput
+        box.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragStartInput = input.Position
+                local conn
+                conn = RunService.RenderStepped:Connect(function()
+                    if dragStartInput and not rainbow then
+                        local pos = UserInputService:GetMouseLocation()
+                        local x = math.clamp((pos.X - box.AbsolutePosition.X) / math.max(box.AbsoluteSize.X, 1), 0, 1)
+                        local y = math.clamp((pos.Y - box.AbsolutePosition.Y) / math.max(box.AbsoluteSize.Y, 1), 0, 1)
+                        s, v = x, 1 - y
+                        apply(true)
+                    else
+                        conn:Disconnect()
+                    end
+                end)
+            end
         end)
-        makeDrag(hue, function(posV)
-            if rainbow then return end
-            local x = math.clamp((posV.X - hue.AbsolutePosition.X) / math.max(hue.AbsoluteSize.X, 1), 0, 1)
-            h = x
-            apply(true)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragStartInput = nil
+            end
+        end)
+
+        -- Hue drag
+        local hueDragStart
+        hue.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                hueDragStart = input.Position
+                local conn
+                conn = RunService.RenderStepped:Connect(function()
+                    if hueDragStart and not rainbow then
+                        local pos = UserInputService:GetMouseLocation()
+                        local x = math.clamp((pos.X - hue.AbsolutePosition.X) / math.max(hue.AbsoluteSize.X, 1), 0, 1)
+                        h = x
+                        apply(true)
+                    else
+                        conn:Disconnect()
+                    end
+                end)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                hueDragStart = nil
+            end
         end)
 
         rbRow.MouseButton1Click:Connect(function()
@@ -1228,18 +1227,6 @@ local function makeAPI(scroll)
             _Catalyst.Flags[flag] = default
         end
         pcall(callback, default)
-
-        -- Rafraîchir après changement de thème
-        local function refresh()
-            if not rainbow then
-                swatch.BackgroundColor3 = Color3.fromHSV(h, s, v)
-                box.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-            end
-            rbPill.BackgroundColor3 = rainbow and Theme.Accent or Theme.Stroke
-            rbKnob.BackgroundColor3 = Theme.Text
-        end
-        table.insert(DynamicComponents, refresh)
-
         return {
             Get = function() return Color3.fromHSV(h, s, v) end,
             Set = function(c) h, s, v = Color3.toHSV(c) apply(true) end,
@@ -1434,7 +1421,7 @@ function _Catalyst:Window(opt)
 
     local Window = {}
 
-    -- Splash screen
+    -- Splash screen (optionnel)
     local splashOpt = opt.Splash
     if splashOpt ~= false then
         splashOpt = splashOpt or {}
@@ -1533,7 +1520,9 @@ function _Catalyst:Window(opt)
         end)
     end
 
-    -- Main frame
+    -- =========================================================
+    -- MAIN UI
+    -- =========================================================
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)

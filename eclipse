@@ -1155,6 +1155,95 @@ function _Catalyst:Window(opt)
 
     local Window = {}
 
+    -- =========================================================
+    -- SPLASH SCREEN ANIMÉ (AVEC TON IMAGE EN FOND)
+    -- =========================================================
+    local splashScreen = Instance.new("Frame")
+    splashScreen.Size = UDim2.new(1, 0, 1, 0)
+    splashScreen.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    splashScreen.BorderSizePixel = 0
+    splashScreen.ZIndex = 100
+    splashScreen.Parent = ScreenGui
+
+    local splashImage = Instance.new("ImageLabel")
+    splashImage.Size = UDim2.new(1, 0, 1, 0)
+    splashImage.BackgroundTransparency = 1
+    splashImage.ImageTransparency = 0.4
+    splashImage.ScaleType = Enum.ScaleType.Crop
+    splashImage.ZIndex = 101
+    splashImage.Parent = splashScreen
+
+    -- Méthode de chargement compatible (comme dans ton autre script)
+    local logoUrl = "https://github.com/ApparentlyZen/image-namelessWare/blob/main/165abdd521328d77324b02ce8a77e090_1780162334922.webp?raw=true"
+    taskLib.spawn(function()
+        pcall(function()
+            if writefile and getcustomasset and game.HttpGet then
+                if not isfile("catalyst_splash.webp") then
+                    writefile("catalyst_splash.webp", game:HttpGet(logoUrl))
+                end
+                splashImage.Image = getcustomasset("catalyst_splash.webp")
+            else
+                splashImage.Image = logoUrl
+            end
+        end)
+    end)
+
+    local splashTitle = Instance.new("TextLabel")
+    splashTitle.Size = UDim2.new(0, 400, 0, 50)
+    splashTitle.Position = UDim2.new(0.5, -200, 0.4, -25)
+    splashTitle.BackgroundTransparency = 1
+    splashTitle.Text = Title
+    splashTitle.Font = Enum.Font.GothamBlack
+    splashTitle.TextSize = 32
+    splashTitle.TextColor3 = Theme.Accent
+    splashTitle.TextTransparency = 1
+    splashTitle.ZIndex = 102
+    splashTitle.Parent = splashScreen
+
+    local splashSub = Instance.new("TextLabel")
+    splashSub.Size = UDim2.new(0, 400, 0, 30)
+    splashSub.Position = UDim2.new(0.5, -200, 0.5, -15)
+    splashSub.BackgroundTransparency = 1
+    splashSub.Text = SubTitle
+    splashSub.Font = Enum.Font.GothamMedium
+    splashSub.TextSize = 16
+    splashSub.TextColor3 = Theme.Text
+    splashSub.TextTransparency = 1
+    splashSub.ZIndex = 102
+    splashSub.Parent = splashScreen
+
+    local splashAccentLine = Instance.new("Frame")
+    splashAccentLine.Size = UDim2.new(0, 0, 0, 2)
+    splashAccentLine.Position = UDim2.new(0.5, 0, 0.55, 0)
+    splashAccentLine.AnchorPoint = Vector2.new(0.5, 0)
+    splashAccentLine.BackgroundColor3 = Theme.Accent
+    splashAccentLine.BorderSizePixel = 0
+    splashAccentLine.ZIndex = 102
+    splashAccentLine.Parent = splashScreen
+
+    -- Animation d'apparition
+    taskLib.spawn(function()
+        taskLib.wait(0.2)
+        tween(splashImage, 1.2, { ImageTransparency = 0.1 })
+        tween(splashTitle, 0.8, { TextTransparency = 0 })
+        tween(splashSub, 0.8, { TextTransparency = 0.6 })
+        tween(splashAccentLine, 1.0, { Size = UDim2.new(0, 250, 0, 2) })
+
+        taskLib.wait(2.5)
+        -- Disparition
+        tween(splashScreen, 0.8, { BackgroundTransparency = 1 })
+        tween(splashImage, 0.8, { ImageTransparency = 1 })
+        tween(splashTitle, 0.5, { TextTransparency = 1 })
+        tween(splashSub, 0.5, { TextTransparency = 1 })
+        tween(splashAccentLine, 0.5, { BackgroundTransparency = 1 })
+
+        taskLib.wait(1.0)
+        splashScreen:Destroy()
+    end)
+
+    -- =========================================================
+    -- INTERFACE PRINCIPALE (identique à avant)
+    -- =========================================================
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)

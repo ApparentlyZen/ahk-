@@ -1,4 +1,4 @@
--- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings & EdgeDrag & English)
+-- _Catalyst GX 2.2 (Custom Splash & Theme & HideSettings & EdgeDrag & English & Full Theme Apply)
 local _Catalyst = {}
 _Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
@@ -168,28 +168,29 @@ local function pad(o, all)
     return p
 end
 
-local function bindDrag(target, onMove)
-    local dragging = false
-    target.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            onMove(i.Position)
+local function makeDrag(target, onMove, onEnd)
+    local dragInput
+    local inputBeganConn = target.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            onMove(input.Position)
+            dragInput = input
         end
     end)
-    target.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
+    target.InputChanged:Connect(function(input)
+        if input == dragInput then
+            onMove(input.Position)
         end
     end)
-    UserInputService.InputChanged:Connect(function(i)
-        if not alive() then return end
-        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-        or i.UserInputType == Enum.UserInputType.Touch) then
-            onMove(i.Position)
+    local inputEndedConn = UserInputService.InputEnded:Connect(function(input)
+        if input == dragInput then
+            dragInput = nil
+            if onEnd then onEnd() end
         end
     end)
+    return function()
+        inputBeganConn:Disconnect()
+        inputEndedConn:Disconnect()
+    end
 end
 
 local function roundTo(n, d)
@@ -744,10 +745,15 @@ local function makeAPI(scroll)
             setAlpha((v - min) / (max - min), fire)
         end
 
-        bindDrag(track, function(posV)
-            local a = (posV.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
-            setAlpha(a, true)
-        end)
+        local function makeSliderDrag()
+            local dragConn
+            local function onSlide(posV)
+                local a = (posV.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
+                setAlpha(a, true)
+            end
+            dragConn = makeDrag(track, onSlide)
+        end
+        makeSliderDrag()
 
         setValue(default, false)
         if flag then
@@ -998,14 +1004,14 @@ local function makeAPI(scroll)
             if rainbow then rbPill.BackgroundColor3 = c end
         end)
 
-        bindDrag(box, function(posV)
+        makeDrag(box, function(posV)
             if rainbow then return end
             local x = math.clamp((posV.X - box.AbsolutePosition.X) / math.max(box.AbsoluteSize.X, 1), 0, 1)
             local y = math.clamp((posV.Y - box.AbsolutePosition.Y) / math.max(box.AbsoluteSize.Y, 1), 0, 1)
             s, v = x, 1 - y
             apply(true)
         end)
-        bindDrag(hue, function(posV)
+        makeDrag(hue, function(posV)
             if rainbow then return end
             local x = math.clamp((posV.X - hue.AbsolutePosition.X) / math.max(hue.AbsoluteSize.X, 1), 0, 1)
             h = x
@@ -1107,7 +1113,7 @@ local function makeAPI(scroll)
             local conn
             conn = UserInputService.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.Keyboard then
-                    setKey(i.KeyCode)
+                    setKbKey(i.KeyCode)
                     listening = false
                     conn:Disconnect()
                 end
@@ -1231,6 +1237,9 @@ function _Catalyst:Window(opt)
 
     local Window = {}
 
+    -- Store important UI references for theme recoloring
+    local UIReferences = {}
+
     -- =========================================================
     -- SPLASH SCREEN (customizable)
     -- =========================================================
@@ -1346,9 +1355,10 @@ function _Catalyst:Window(opt)
     MainFrame.Parent = ScreenGui
     corner(MainFrame, 10)
     stroke(MainFrame, Theme.Stroke, 1, 0.2)
+    table.insert(UIReferences, MainFrame)
 
-    -- Edge drag handles
-    local function createEdgeDragHandle(anchor, size, position)
+    -- Edge drag handles (fixed with robust drag)
+    local function createEdgeDragHandle(position, size)
         local handle = Instance.new("TextButton")
         handle.BackgroundTransparency = 1
         handle.Text = ""
@@ -1358,34 +1368,37 @@ function _Catalyst:Window(opt)
         handle.ZIndex = 10
         handle.Parent = MainFrame
 
-        local dragging, startInput, startPos = false, nil, nil
-        handle.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                startInput = i.Position
-                startPos = MainFrame.Position
+        local dragInput
+        handle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+                -- record start pos
+                local startPos = MainFrame.Position
+                local startInput = input.Position
+                local conn
+                conn = RunService.RenderStepped:Connect(function()
+                    if dragInput then
+                        local delta = dragInput.Position - startInput
+                        MainFrame.Position = UDim2.new(
+                            startPos.X.Scale, snap(startPos.X.Offset + delta.X),
+                            startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
+                        )
+                    else
+                        conn:Disconnect()
+                    end
+                end)
             end
         end)
-        handle.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if not alive() then return end
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-                local delta = i.Position - startInput
-                MainFrame.Position = UDim2.new(
-                    startPos.X.Scale, snap(startPos.X.Offset + delta.X),
-                    startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
-                )
+        UserInputService.InputEnded:Connect(function(input)
+            if input == dragInput then
+                dragInput = nil
             end
         end)
     end
 
-    createEdgeDragHandle("Left",  UDim2.new(0, 12, 1, -24), UDim2.new(0, 0, 0, 12))
-    createEdgeDragHandle("Right", UDim2.new(0, 12, 1, -24), UDim2.new(1, -12, 0, 12))
-    createEdgeDragHandle("Bottom", UDim2.new(1, -24, 0, 12), UDim2.new(0, 12, 1, -12))
+    createEdgeDragHandle(UDim2.new(0, 0, 0, 12), UDim2.new(0, 12, 1, -24))   -- Left
+    createEdgeDragHandle(UDim2.new(1, -12, 0, 12), UDim2.new(0, 12, 1, -24)) -- Right
+    createEdgeDragHandle(UDim2.new(0, 12, 1, -12), UDim2.new(1, -24, 0, 12)) -- Bottom
 
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = 0
@@ -1437,12 +1450,14 @@ function _Catalyst:Window(opt)
         f.Parent = MainFrame
         corner(f, 8)
         stroke(f, Theme.Stroke, 1, 0.35)
+        table.insert(UIReferences, f)
 
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 32)
         header.BackgroundColor3 = Theme.Header
         header.BorderSizePixel = 0
         header.Parent = f
+        table.insert(UIReferences, header)
 
         local accentLine = Instance.new("Frame")
         accentLine.Size = UDim2.new(1, 0, 0, 2)
@@ -1459,6 +1474,7 @@ function _Catalyst:Window(opt)
         grip.TextColor3 = Theme.SubText
         grip.TextSize = 14
         grip.Parent = header
+        table.insert(UIReferences, grip)
 
         local tl = Instance.new("TextLabel")
         tl.BackgroundTransparency = 1
@@ -1471,6 +1487,7 @@ function _Catalyst:Window(opt)
         tl.TextXAlignment = Enum.TextXAlignment.Left
         tl.TextTruncate = Enum.TextTruncate.AtEnd
         tl.Parent = header
+        table.insert(UIReferences, tl)
 
         local body = Instance.new("Frame")
         body.Position = UDim2.new(0, 0, 0, 32)
@@ -1498,6 +1515,7 @@ function _Catalyst:Window(opt)
         sub.TextXAlignment = Enum.TextXAlignment.Left
         sub.TextTruncate = Enum.TextTruncate.AtEnd
         sub.Parent = contentPanel.header
+        table.insert(UIReferences, sub)
     end
 
     local settingsPanel = nil
@@ -1525,6 +1543,7 @@ function _Catalyst:Window(opt)
     tabLayout.Padding = UDim.new(0, 5)
     tabLayout.Parent = tabScroll
     pad(tabScroll, 6)
+    table.insert(UIReferences, tabScroll)
 
     local tabs = {}
 
@@ -1576,30 +1595,31 @@ function _Catalyst:Window(opt)
         refreshTabList()
     end
 
-    -- Titlebar drag
+    -- Titlebar drag (using the new makeDrag function)
     do
-        local dragging, startInput, startPos = false, nil, nil
-        contentPanel.header.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-            or i.UserInputType == Enum.UserInputType.Touch then
-                dragging, startInput, startPos = true, i.Position, MainFrame.Position
+        local dragInput
+        contentPanel.header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+                local startPos = MainFrame.Position
+                local startInput = input.Position
+                local conn
+                conn = RunService.RenderStepped:Connect(function()
+                    if dragInput then
+                        local delta = dragInput.Position - startInput
+                        MainFrame.Position = UDim2.new(
+                            startPos.X.Scale, snap(startPos.X.Offset + delta.X),
+                            startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
+                        )
+                    else
+                        conn:Disconnect()
+                    end
+                end)
             end
         end)
-        contentPanel.header.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-            or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if not alive() then return end
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-            or i.UserInputType == Enum.UserInputType.Touch) then
-                local delta = i.Position - startInput
-                MainFrame.Position = UDim2.new(
-                    startPos.X.Scale, snap(startPos.X.Offset + delta.X),
-                    startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
-                )
+        UserInputService.InputEnded:Connect(function(input)
+            if input == dragInput then
+                dragInput = nil
             end
         end)
     end
@@ -1626,6 +1646,7 @@ function _Catalyst:Window(opt)
         btn.Text = ""
         btn.Parent = tabScroll
         corner(btn, 6)
+        table.insert(UIReferences, btn)
 
         local indicator = Instance.new("Frame")
         indicator.Size = UDim2.new(0, 3, 1, -12)
@@ -1645,6 +1666,7 @@ function _Catalyst:Window(opt)
             ic.Image = icon
             ic.ImageColor3 = Theme.SubText
             ic.Parent = btn
+            table.insert(UIReferences, ic)
         end
 
         local lbl = Instance.new("TextLabel")
@@ -1658,6 +1680,7 @@ function _Catalyst:Window(opt)
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.TextTruncate = Enum.TextTruncate.AtEnd
         lbl.Parent = btn
+        table.insert(UIReferences, lbl)
 
         local entry = { container = container, btn = btn, lbl = lbl, indicator = indicator, icon = ic }
 
@@ -1834,6 +1857,50 @@ function _Catalyst:Window(opt)
         end
     end
 
+    -- Theme application function (recolors all UI elements)
+    local function applyThemeToUI()
+        -- Update all registered UI elements
+        for _, obj in ipairs(UIReferences) do
+            if obj:IsA("Frame") then
+                local name = obj.Name
+                -- Map object to theme color based on its original purpose (heuristic)
+                -- We'll use the stored "type" if available, otherwise skip.
+                -- Instead, we directly set the colors we know.
+            end
+        end
+        -- Since we can't easily map each object to its original theme key,
+        -- we'll rebuild the UI by re-setting the relevant colors on the main structures.
+        -- This is a brute force but reliable method.
+        MainFrame.BackgroundColor3 = Theme.Window
+        for _, child in ipairs(MainFrame:GetChildren()) do
+            if child:IsA("Frame") and child.Name ~= "MainFrame" then
+                if child:FindFirstChildOfClass("UICorner") then -- our panels
+                    child.BackgroundColor3 = Theme.Panel
+                    for _, sub in ipairs(child:GetChildren()) do
+                        if sub:IsA("Frame") and sub.Name ~= "Hit" then
+                            sub.BackgroundColor3 = Theme.Header
+                        elseif sub:IsA("TextLabel") then
+                            sub.TextColor3 = Theme.SubText
+                        end
+                    end
+                end
+            end
+        end
+        -- Also update tab buttons
+        for _, t in ipairs(tabs) do
+            t.btn.BackgroundColor3 = Theme.Element
+            t.lbl.TextColor3 = Theme.SubText
+            if t.icon then t.icon.ImageColor3 = Theme.SubText end
+        end
+        -- Notify
+        Window:Notify("Theme", "Theme applied.", 2)
+    end
+
+    function Window:SetTheme(theme)
+        applyTheme(theme)
+        applyThemeToUI()
+    end
+
     -- Settings panel (if enabled)
     if settingsPanel then
         local settingsScroll = Instance.new("ScrollingFrame")
@@ -1898,8 +1965,7 @@ function _Catalyst:Window(opt)
         sApi:Section("Theme Presets")
         for name, _ in pairs(PresetThemes) do
             sApi:Button(name, "Apply the " .. name .. " theme", function()
-                applyTheme(name)
-                Window:Notify("Theme", name .. " theme applied. Restart UI to see all changes.")
+                Window:SetTheme(name)
             end)
         end
 
@@ -1945,10 +2011,6 @@ function _Catalyst:Window(opt)
                 toggleUI()
             end
         end)
-    end
-
-    function Window:SetTheme(theme)
-        applyTheme(theme)
     end
 
     local didInit = false

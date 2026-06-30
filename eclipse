@@ -1,7 +1,7 @@
 --[[
     _Catalyst GX 2.2 - UI Library
     • 12 preset themes (Default, Ocean, Midnight, Crimson, Emerald, Sunset, Aurora, Frost, Shadow, Rose, Neon, Galaxy)
-    • Draggable window (title bar + edges)
+    • Draggable window (title bar + edges) - FIXED with RenderStepped
     • Splash screen (customizable)
     • Mobile FAB button
     • Full theme system (recolors everything)
@@ -220,7 +220,6 @@ local function applyTheme(customTheme)
         end
     end
 
-    -- Apply to ALL registered objects
     for _, entry in ipairs(ThemeObjects) do
         if entry.obj and entry.obj.Parent and Theme[entry.themeKey] then
             pcall(function()
@@ -271,30 +270,47 @@ local function pad(o, all)
     return p
 end
 
+--==============================================
+-- DRAG (CORRIGÉ - RenderStepped)
+--==============================================
 local function makeDrag(handle, getMainFrame)
     local dragInput, startPos, startMouse
+    local renderConn
+
     handle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or
            input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
             startPos = getMainFrame().Position
             startMouse = input.Position
+
+            renderConn = RunService.RenderStepped:Connect(function()
+                if dragInput then
+                    local currentMouse = UserInputService:GetMouseLocation()
+                    local delta = currentMouse - startMouse
+                    getMainFrame().Position = UDim2.new(
+                        startPos.X.Scale,
+                        startPos.X.Offset + delta.X,
+                        startPos.Y.Scale,
+                        startPos.Y.Offset + delta.Y
+                    )
+                else
+                    if renderConn then
+                        renderConn:Disconnect()
+                        renderConn = nil
+                    end
+                end
+            end)
         end
     end)
-    handle.InputChanged:Connect(function(input)
-        if input == dragInput then
-            local delta = input.Position - startMouse
-            getMainFrame().Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-    handle.InputEnded:Connect(function(input)
+
+    UserInputService.InputEnded:Connect(function(input)
         if input == dragInput then
             dragInput = nil
+            if renderConn then
+                renderConn:Disconnect()
+                renderConn = nil
+            end
         end
     end)
 end
@@ -305,7 +321,7 @@ local function roundTo(n, d)
 end
 
 --==============================================
--- FILE SYSTEM (compatible)
+-- FILE SYSTEM
 --==============================================
 local FileSystem = {}
 do
@@ -872,22 +888,30 @@ local function makeAPI(scroll)
         end
 
         -- Slider drag
-        local sDragInput
+        local sDragInput, sRenderConn
+        local sStartPos, sStartMouse
         track.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or
                input.UserInputType == Enum.UserInputType.Touch then
                 sDragInput = input
+                sStartMouse = input.Position
+                sRenderConn = RunService.RenderStepped:Connect(function()
+                    if sDragInput then
+                        local currentMouse = UserInputService:GetMouseLocation()
+                        local a = (currentMouse.X - track.AbsolutePosition.X) /
+                                 math.max(track.AbsoluteSize.X, 1)
+                        setAlpha(a, true)
+                    else
+                        if sRenderConn then sRenderConn:Disconnect(); sRenderConn = nil end
+                    end
+                end)
             end
         end)
-        track.InputChanged:Connect(function(input)
+        UserInputService.InputEnded:Connect(function(input)
             if input == sDragInput then
-                local a = (input.Position.X - track.AbsolutePosition.X) /
-                         math.max(track.AbsoluteSize.X, 1)
-                setAlpha(a, true)
+                sDragInput = nil
+                if sRenderConn then sRenderConn:Disconnect(); sRenderConn = nil end
             end
-        end)
-        track.InputEnded:Connect(function(input)
-            if input == sDragInput then sDragInput = nil end
         end)
 
         setValue(default, false)
@@ -1155,48 +1179,54 @@ local function makeAPI(scroll)
         end
 
         -- Box drag
-        local bDragInput
+        local bDragInput, bRenderConn
         box.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or
                input.UserInputType == Enum.UserInputType.Touch then
                 bDragInput = input
+                bRenderConn = RunService.RenderStepped:Connect(function()
+                    if bDragInput and not rainbow then
+                        local currentMouse = UserInputService:GetMouseLocation()
+                        local x = math.clamp((currentMouse.X - box.AbsolutePosition.X) / math.max(box.AbsoluteSize.X, 1), 0, 1)
+                        local y = math.clamp((currentMouse.Y - box.AbsolutePosition.Y) / math.max(box.AbsoluteSize.Y, 1), 0, 1)
+                        s, v = x, 1 - y
+                        apply(true)
+                    else
+                        if bRenderConn then bRenderConn:Disconnect(); bRenderConn = nil end
+                    end
+                end)
             end
         end)
-        box.InputChanged:Connect(function(input)
-            if input == bDragInput and not rainbow then
-                local x = math.clamp(
-                    (input.Position.X - box.AbsolutePosition.X) /
-                    math.max(box.AbsoluteSize.X, 1), 0, 1)
-                local y = math.clamp(
-                    (input.Position.Y - box.AbsolutePosition.Y) /
-                    math.max(box.AbsoluteSize.Y, 1), 0, 1)
-                s, v = x, 1 - y
-                apply(true)
+        UserInputService.InputEnded:Connect(function(input)
+            if input == bDragInput then
+                bDragInput = nil
+                if bRenderConn then bRenderConn:Disconnect(); bRenderConn = nil end
             end
-        end)
-        box.InputEnded:Connect(function(input)
-            if input == bDragInput then bDragInput = nil end
         end)
 
         -- Hue drag
-        local hDragInput
+        local hDragInput, hRenderConn
         hue.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or
                input.UserInputType == Enum.UserInputType.Touch then
                 hDragInput = input
+                hRenderConn = RunService.RenderStepped:Connect(function()
+                    if hDragInput and not rainbow then
+                        local currentMouse = UserInputService:GetMouseLocation()
+                        local x = math.clamp((currentMouse.X - hue.AbsolutePosition.X) / math.max(hue.AbsoluteSize.X, 1), 0, 1)
+                        h = x
+                        apply(true)
+                    else
+                        if hRenderConn then hRenderConn:Disconnect(); hRenderConn = nil end
+                    end
+                end)
             end
         end)
-        hue.InputChanged:Connect(function(input)
-            if input == hDragInput and not rainbow then
-                local x = math.clamp(
-                    (input.Position.X - hue.AbsolutePosition.X) /
-                    math.max(hue.AbsoluteSize.X, 1), 0, 1)
-                h = x
-                apply(true)
+        UserInputService.InputEnded:Connect(function(input)
+            if input == hDragInput then
+                hDragInput = nil
+                if hRenderConn then hRenderConn:Disconnect(); hRenderConn = nil end
             end
-        end)
-        hue.InputEnded:Connect(function(input)
-            if input == hDragInput then hDragInput = nil end
         end)
 
         rbRow.MouseButton1Click:Connect(function()
@@ -1438,7 +1468,6 @@ function _Catalyst:Window(opt)
     local ConfigFolder = opt.ConfigFolder or "_CatalystConfigs"
     local ToggleKey = opt.ToggleKey or opt.CloseBind or Enum.KeyCode.RightAlt
 
-    -- Apply initial theme
     applyTheme(opt.Theme)
     FileSystem.makeFolder(ConfigFolder)
 
@@ -1523,7 +1552,6 @@ function _Catalyst:Window(opt)
         splashAccentLine.ZIndex = 102
         splashAccentLine.Parent = splashScreen
 
-        -- Load image
         taskLib.spawn(function()
             pcall(function()
                 if writefile and getcustomasset and game.HttpGet then
@@ -1538,7 +1566,6 @@ function _Catalyst:Window(opt)
             end)
         end)
 
-        -- Animate
         taskLib.spawn(function()
             taskLib.wait(0.2)
             tween(splashImage, 1.2, { ImageTransparency = 0.05 })
@@ -1778,12 +1805,10 @@ function _Catalyst:Window(opt)
             h = WIN_H - 2 * PAD
         }
 
-        -- Tabs panel (left)
         placeFrame(tabsPanel.frame, rect.x, rect.y, SIDE_W, rect.h, animated)
         rect.x = rect.x + SIDE_W + GAP
         rect.w = rect.w - SIDE_W - GAP
 
-        -- Settings panel (right, if enabled)
         if settingsPanel then
             placeFrame(settingsPanel.frame,
                        rect.x + rect.w - SIDE_W, rect.y,
@@ -1791,7 +1816,6 @@ function _Catalyst:Window(opt)
             rect.w = rect.w - SIDE_W - GAP
         end
 
-        -- Content panel (center)
         placeFrame(contentPanel.frame, rect.x, rect.y,
                    rect.w, rect.h, animated)
 

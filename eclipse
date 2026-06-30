@@ -1,5 +1,6 @@
+-- _Catalyst GX 2.2 (Draggable, No Dock)
 local _Catalyst = {}
-_Catalyst.Version = "GX 2.2 (Static)"
+_Catalyst.Version = "GX 2.2"
 _Catalyst.RainbowColorValue = 0
 _Catalyst.HueSelectionPosition = 0
 _Catalyst.Flags = {}
@@ -1280,8 +1281,6 @@ function _Catalyst:Window(opt)
         sub.Parent = contentPanel.header
     end
 
-    -- Static layout: Tabs left, Content center, Settings right.
-    -- No drag or re-dock allowed.
     local panels = {
         Tabs     = { panel = tabsPanel,     edge = "Left",  order = 1 },
         Settings = { panel = settingsPanel, edge = "Right", order = 1 },
@@ -1338,22 +1337,49 @@ function _Catalyst:Window(opt)
 
     local function relayout(animated)
         local rect = { x = PAD, y = PAD, w = WIN_W - 2 * PAD, h = WIN_H - 2 * PAD }
-        -- Tabs always on left
+        -- Tabs left
         placeFrame(tabsPanel.frame, rect.x, rect.y, SIDE_W, rect.h, animated)
         rect.x = rect.x + SIDE_W + GAP
         rect.w = rect.w - SIDE_W - GAP
 
-        -- Settings always on right
+        -- Settings right
         placeFrame(settingsPanel.frame, rect.x + rect.w - SIDE_W, rect.y, SIDE_W, rect.h, animated)
         rect.w = rect.w - SIDE_W - GAP
 
-        -- Content in the middle
+        -- Content center
         placeFrame(contentPanel.frame, rect.x, rect.y, rect.w, rect.h, animated)
         refreshTabList()
     end
 
-    -- Remove all drag, drop zones, and nearestEdge logic (window is static)
-    -- No panel dragging: the headers are just static labels now.
+    -- Window dragging (keep)
+    do
+        local dragging, startInput, startPos = false, nil, nil
+        contentPanel.header.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1
+            or i.UserInputType == Enum.UserInputType.Touch then
+                dragging, startInput, startPos = true, i.Position, MainFrame.Position
+            end
+        end)
+        contentPanel.header.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1
+            or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if not alive() then return end
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
+            or i.UserInputType == Enum.UserInputType.Touch) then
+                local delta = i.Position - startInput
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale, snap(startPos.X.Offset + delta.X),
+                    startPos.Y.Scale, snap(startPos.Y.Offset + delta.Y)
+                )
+            end
+        end)
+    end
+
+    -- No panel dragging (removed zones, nearestEdge, makePanelDrag)
 
     local firstTab = true
     function Window:Tab(name, icon)
@@ -1676,7 +1702,7 @@ function _Catalyst:Window(opt)
         ring.Parent = fab
         regAccent(ring, "Color")
 
-        -- Mobile FAB is now static; only toggles the UI on click.
+        -- Static FAB toggles UI
         fab.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1
             or i.UserInputType == Enum.UserInputType.Touch then

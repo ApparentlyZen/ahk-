@@ -320,8 +320,9 @@ end)
 -- ====================================================================
 -- INTERFACE GRAPHIQUE PRINCIPALE
 -- ====================================================================
-local ScreenGui = Instance.new("ScreenGui", PlayerGui)
-ScreenGui.Name = "namelessWare_AHK_Combo"
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "namelessWare_AHK_Combo_V2" -- Nom unique pour éviter les conflits
+ScreenGui.Parent = PlayerGui
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = mkFrame(ScreenGui, UDim2.new(0, 560, 0, 320), UDim2.new(0.5, -280, 0.5, -160), T_BG, 8)

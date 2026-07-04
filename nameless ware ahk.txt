@@ -44,7 +44,7 @@ local godhumanZActive, aimlockActive = false, false
 local rightTouchActive = false
 local aimRenderConn, aimTimeoutTask = nil, nil
 local characterConnections = {}
-
+local lastExecutedSkill = nil -- Accusé de réception synchrone (VIM Strict)
 
 getgenv().ActivatedSkills = {
     Melee = {
@@ -497,7 +497,7 @@ local uiList = Instance.new("UIListLayout", QueueScroll)
 uiList.SortOrder = Enum.SortOrder.LayoutOrder
 uiList.Padding = UDim.new(0, 4)
 
--- BOUTON DE CALCUL INTELLIGENT MATHÉMATIQUE SANS HASARD
+-- BOUTON DE CALCUL SANS HASARD
 local CalcBtn = Instance.new("TextButton", ContentRight)
 CalcBtn.Size = UDim2.new(1, -16, 0, 26)
 CalcBtn.Position = UDim2.new(0, 8, 1, -34)
@@ -670,10 +670,10 @@ uiList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 end)
 
 ----------------------------------------------------
--- LOGIQUE UNIQUE DU BOUTON : CALCUL DES DÉLAIS SELON L'ORDRE ET LE TYPE D'ARME
+-- LOGIQUE UNIQUE DU BOUTON : CALCUL DES DÉLAIS
 ----------------------------------------------------
 CalcBtn.MouseButton1Click:Connect(function()
-    local ping = lp:GetNetworkPing() -- Ping exact en secondes (ex: 0.05 pour 50ms)
+    local ping = lp:GetNetworkPing()
     local prevCat = nil
     
     for index, item in ipairs(comboQueue) do
@@ -683,22 +683,17 @@ CalcBtn.MouseButton1Click:Connect(function()
         
         local optimalDelay = 0
         if index == 1 then
-            -- Premier skill de l'enchaînement
             optimalDelay = math.max(0.05, tonumber(string.format("%.2f", ping * 1.2)))
         else
             if prevCat ~= cat then
-                -- CHANGEMENT D'ARME (ex: Gun -> Melee) : Sécurité accrue anti-bug d'équipement
                 optimalDelay = math.max(0.18, tonumber(string.format("%.2f", ping * 1.7)))
             else
-                -- MÊME ARME CONTINUÉ (ex: Melee Z -> Melee X) : Envoi instantané sans latence
                 optimalDelay = math.max(0.04, tonumber(string.format("%.2f", ping * 0.9)))
             end
         end
         
-        -- Sauvegarde interne des données
         data.delay = optimalDelay
         
-        -- Mise à jour visuelle immédiate dans la TextBox de l'UI
         local box = delayBoxesRegistry[cat .. "_" .. skill]
         if box then
             box.Text = optimalDelay .. "s"
@@ -707,10 +702,8 @@ CalcBtn.MouseButton1Click:Connect(function()
         prevCat = cat
     end
     
-    -- Rafraîchir l'affichage du panneau droit
     RedrawQueueOrder()
     
-    -- Effet visuel temporaire sur le bouton
     CalcBtn.Text = "✔️ DÉLAIS LOGIQUES APPLIQUÉS !"
     task.wait(1)
     CalcBtn.Text = "⚡ CALCULER PING DELAY (ANTI-BUG)"
@@ -872,14 +865,13 @@ task.spawn(function()
             
             if canTrigger and #comboQueue > 0 then
                 canTrigger = false
-                
-                if getgenv().UseSilentAim then getgenv().isComboActive = true end
+                getgenv().isComboActive = true -- Allumage global du moteur pour le Silent Aim de la V7.4
 
-                for _, item in ipairs(comboQueue) do
+                for index, item in ipairs(comboQueue) do
                     local cat = item.cat
                     local data = getgenv().ActivatedSkills[cat][item.skill]
                     
-                    if data and data.active == true then
+                    if data and data.active == true and getgenv().isComboActive then
                         
                         -- ÉTAPE 1 : EQUIPEMENT DIRECT DE L'ARME
                         if getgenv().SelectedMod == "V2" then
@@ -898,26 +890,56 @@ task.spawn(function()
                             task.wait(data.delay)
                         end
                         
-                        -- ÉTAPE 3 : RENDER DU SKILL (VIM GHOST CLICK)
+                        -- ÉTAPE 3 : RENDER DU SKILL (VIM GHOST CLICK AVEC ACCUSÉ DE RÉCEPTION SYNCHRONE)
                         local skillKey = GetKeyCode(item.skill)
                         if skillKey then
-                            if data.hold and data.hold > 0 then
-                                VirtualInputManager:SendKeyEvent(true, skillKey, false, game)
-                                task.wait(data.hold)
-                                VirtualInputManager:SendKeyEvent(false, skillKey, false, game)
-                            else
-                                -- ⚡ VIM de soru macro combo.txt (Exécution Ultra Instantanée)
-                                task.wait(0.01)
-                                VirtualInputManager:SendKeyEvent(true, skillKey, false, game)
-                                RunService.RenderStepped:Wait()
-                                VirtualInputManager:SendKeyEvent(false, skillKey, false, game)
+                            local fired = false
+                            local spammedCount = 0
+                            local maxSpamAttempts = 6 -- SÉCURITÉ ANTI-BOUCLE INFINIE
+                            lastExecutedSkill = nil
+
+                            while not fired and data.active and getgenv().isComboActive and spammedCount < maxSpamAttempts do
+                                if getgenv().SelectedMod == "V2" then ForceEquipToolByTip(cat) end
+
+                                if data.hold and data.hold > 0 then
+                                    VirtualInputManager:SendKeyEvent(true, skillKey, false, game)
+                                    task.wait(data.hold)
+                                    VirtualInputManager:SendKeyEvent(false, skillKey, false, game)
+                                    fired = true
+                                else
+                                    VirtualInputManager:SendKeyEvent(true, skillKey, false, game)
+                                    RunService.RenderStepped:Wait()
+                                    VirtualInputManager:SendKeyEvent(false, skillKey, false, game)
+                                end
+
+                                spammedCount = spammedCount + 1
+
+                                -- Fenêtre d'interception synchrone via Namecall (Sauf pour les lancers à maintien)
+                                if not data.hold or data.hold == 0 then
+                                    local startCheck = os.clock()
+                                    while os.clock() - startCheck < 0.12 do
+                                        if lastExecutedSkill == item.skill:upper() then fired = true break end
+                                        RunService.Heartbeat:Wait()
+                                    end
+                                end
+
+                                if fired then
+                                    StatusLbl.Text = "✅ [" .. index .. "] Validé : " .. item.skill
+                                    StatusLbl.TextColor3 = C.green
+                                else
+                                    StatusLbl.Text = "⚡ [" .. index .. "] Spam Soru : " .. item.skill .. " (" .. spammedCount .. "/" .. maxSpamAttempts .. ")"
+                                    StatusLbl.TextColor3 = C.gold
+                                    task.wait(0.02)
+                                end
                             end
                         end
                     end
                 end
                 
-                task.wait(0.2) -- Petit délai pour s'assurer que la dernière attaque est bien redirigée
-                if getgenv().UseSilentAim then getgenv().isComboActive = false end -- Désactive le mode combo, le SA redevient passif
+                task.wait(0.2) 
+                getgenv().isComboActive = false -- Extinction propre : le combo s'arrête ici
+                StatusLbl.Text = "Remote Detection: ALWAYS ON"
+                StatusLbl.TextColor3 = C.green
 
                 task.wait(COMBOMAX_COOLDOWN)
                 canTrigger = true
@@ -941,7 +963,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         soruSignal = true
     end
 
-    -- Détection des V-Skills et Z-Skills
+    -- Détection des V-Skills et Z-Skills + Accusé de réception synchrone
     if typeof(args[1]) == "string" then
         local skill = args[1]:upper()
         if skill == "Z" and currentTool then
@@ -950,6 +972,10 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             if currentTool.Name == "Cursed Dual Katana" then cursedZActive = true end
         elseif skill == "V" and lastTool == "Dough-Dough" then
             vActive = true
+        end
+
+        if table.find({"Z", "X", "C", "V", "F"}, skill) then
+            lastExecutedSkill = skill 
         end
     end
 
@@ -968,4 +994,4 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, unpack(args))
 end)
 
-print("namelessWare V7.4 — Module Smart Ping épuré et recalcul déterministe opérationnel.")
+print("namelessWare V7.4 — Module Soru synchronisé et moteur anti-bloquant opérationnel.")
